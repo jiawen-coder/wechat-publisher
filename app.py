@@ -615,8 +615,9 @@ def rewrite_article():
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"请将以下内容改写成一篇完整的公众号文章：\n\n---\n{content}\n---\n\n请直接输出完整文章："}
             ],
-            max_tokens=8000,  # 增加到8000确保长文不被截断
-            temperature=0.75  # 稍微提高创造性
+            max_tokens=4000,  # 降低到4000减少内存消耗（Render免费版限制）
+            temperature=0.75,
+            timeout=60  # 60秒超时
         )
         
         article = response.choices[0].message.content.strip()
