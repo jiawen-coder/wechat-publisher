@@ -338,6 +338,77 @@ def config_keys_api():
     })
 
 
+@app.route('/api/config/prompts', methods=['GET'])
+def config_prompts_api():
+    """获取 AI 提示词配置（从环境变量读取，简化为三大核心 Prompt）"""
+    import os
+    
+    # --- 1. 文章改写 Prompt (李继刚风格 1.0) ---
+    # 占位符: {content} (原文), {style} (用户选的风格)
+    default_article_prompt = """## Role: 资深微信公众号爆款写手 (李继刚风格 1.0)
+
+## Profile:
+你是一位擅长深刻洞察、逻辑严密、表达富有节奏感的顶尖自媒体人。你的文章不仅有深度，更能引发情绪共鸣，排版精美。
+
+## Rules:
+1. **核心逻辑**：保留原文核心观点，不遗漏任何重要细节。
+2. **深度扩展**：对每个观点进行多维度的论证，加入金句、案例或数据支撑。
+3. **语言风格**：{style}
+4. **结构规范**：
+    - 使用 # 一级标题作为文章标题
+    - 开篇必须引人入胜（金句开场或深刻提问）
+    - 章节间使用 ## 二级标题，逻辑层层递进
+    - 结尾必须有力，提供行动指南或深刻总结
+5. **格式**：直接输出 Markdown 格式，不要任何解释说明。
+
+## Content:
+请基于以下内容进行创作：
+---
+{content}
+---"""
+
+    # --- 2. HTML 样式生成 Prompt (JSON 格式) ---
+    # 占位符: {style_description} (用户描述的风格)
+    default_layout_prompt = """根据以下风格描述，生成一组公众号专属的 CSS 配置（JSON格式）：
+
+风格描述：{style_description}
+
+请返回以下格式的 JSON（只返回 JSON，不要其他内容）：
+{{
+    "primary_color": "#主题色",
+    "secondary_color": "#背景色",
+    "text_color": "#正文颜色",
+    "heading_color": "#标题颜色",
+    "link_color": "#链接颜色",
+    "code_bg": "#代码背景",
+    "blockquote_border": "#引用边框",
+    "blockquote_bg": "#引用背景色",
+    "font_family": "字体集",
+    "heading_style": "normal/underline/background/border-left",
+    "paragraph_indent": true/false,
+    "line_height": 1.8
+}}"""
+
+    # --- 3. 封面图描述生成 Prompt ---
+    # 占位符: {title} (标题), {summary} (摘要), {style} (封面愿景)
+    default_cover_prompt = """你是一位顶尖的视觉设计师。请根据文章信息，设计一个极具视觉张力的公众号封面图描述词（中英双语）。
+
+文章标题：{title}
+文章摘要：{summary}
+视觉风格要求：{style}
+
+要求：
+1. 描述必须具体、视觉化、充满电影感或设计感。
+2. 不要出现文字。
+3. 直接输出描述词，不超过 60 字。"""
+
+    return jsonify({
+        "article_prompt": os.environ.get("PROMPT_ARTICLE", default_article_prompt),
+        "layout_prompt": os.environ.get("PROMPT_LAYOUT", default_layout_prompt),
+        "cover_prompt": os.environ.get("PROMPT_COVER", default_cover_prompt)
+    })
+
+
 @app.route('/api/parse', methods=['POST'])
 def parse_content():
     """解析内容，提取元数据"""
@@ -356,49 +427,125 @@ def parse_content():
     })
 
 
-@app.route('/api/convert', methods=['POST'])
-def convert_content():
-    """将 Markdown 转换为公众号 HTML"""
+@app.route('/api/generate-cover', methods=['POST'])
+def generate_cover():
+    """生成封面图"""
     data = request.json
-    content = data.get('content', '')
+    title = data.get('title', '')
+    summary = data.get('summary', '')
     theme = data.get('theme', 'professional')
-    
-    if not content:
-        return jsonify({"error": "内容不能为空"}), 400
-    
-    html = convert_markdown_to_wechat_html(content, theme)
-    metadata = extract_metadata(content)
-    
-    return jsonify({
-        "html": html,
-        "title": metadata["title"],
-        "summary": metadata["summary"]
-    })
-
-
-@app.route('/api/convert-custom', methods=['POST'])
-def convert_custom():
-    """使用自定义风格转换"""
-    data = request.json
-    content = data.get('content', '')
-    style_description = data.get('style_description', '')
-    
-    if not content:
-        return jsonify({"error": "内容不能为空"}), 400
-    
-    if not style_description:
-        return jsonify({"error": "请提供风格描述"}), 400
+    style = data.get('style', '')  # 这里的 style 是封面愿景/自定义描述
     
     user_id = request.headers.get('X-User-Id')
     cfg = load_user_config(user_id)
-    html = generate_custom_style_html(content, style_description, cfg.get("deepseek_api_key"))
-    metadata = extract_metadata(content)
     
-    return jsonify({
-        "html": html,
-        "title": metadata["title"],
-        "summary": metadata["summary"]
-    })
+    # 1. 获取封面描述 Prompt
+    default_cover_prompt = """你是一位顶尖的视觉设计师。请根据文章信息，设计一个极具视觉张力的公众号封面图描述词（中英双语）。\n\n文章标题：{title}\n文章摘要：{summary}\n视觉风格要求：{style}\n\n要求：\n1. 描述必须具体、视觉化、充满电影感或设计感。\n2. 不要出现文字。\n3. 直接输出描述词，不超过 60 字。"""
+    prompt = os.environ.get("PROMPT_COVER", default_cover_prompt)
+    
+    cover_prompt = title
+    if cfg.get("deepseek_api_key") and (summary or title):
+        try:
+            client = openai.OpenAI(
+                api_key=cfg["deepseek_api_key"],
+                base_url="https://api.deepseek.com"
+            )
+            
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{
+                    "role": "user",
+                    "content": prompt.format(
+                        title=title, 
+                        summary=summary, 
+                        style=(style if style else '专业简约')
+                    )
+                }],
+                max_tokens=100
+            )
+            cover_prompt = response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"AI 生成提示词失败: {e}")
+            cover_prompt = f"{title}，{style if style else '专业简约风格'}"
+    
+    # 2. 调用绘图服务
+    output_dir = str(TEMP_DIR)
+    if cfg.get("poe_api_key"):
+        import backend.config as app_config
+        app_config.POE_API_KEY = cfg["poe_api_key"]
+    
+    result = generate_cover_image(title=cover_prompt, theme_name=theme, output_dir=output_dir)
+    # ... 后续逻辑保持一致 (正常返回或 fallback)
+    if result["success"]:
+        filename = os.path.basename(result["file_path"])
+        return jsonify({"success": True, "image_url": f"/api/cover/{filename}", "prompt": cover_prompt})
+    else:
+        result = generate_fallback_cover(title, theme, output_dir)
+        if result["success"]:
+            filename = os.path.basename(result["file_path"])
+            return jsonify({"success": True, "image_url": f"/api/cover/{filename}", "prompt": cover_prompt, "fallback": True})
+        return jsonify({"success": False, "error": result["error"]}), 500
+
+
+def generate_custom_style_html(md_content: str, style_description: str, deepseek_api_key: str = None) -> str:
+    """根据用户自定义风格描述生成 HTML (使用简化 Prompt)"""
+    import openai
+    import json as json_lib
+    if not deepseek_api_key:
+        return convert_markdown_to_wechat_html(md_content, "professional")
+    
+    try:
+        # 获取样式 Prompt
+        default_layout_prompt = """根据以下风格描述，生成一组公众号专属的 CSS 配置（JSON格式）：
+
+风格描述：{style_description}
+
+请返回以下格式的 JSON（只返回 JSON，不要其他内容）：
+{{
+    "primary_color": "#主题色",
+    "secondary_color": "#背景色",
+    "text_color": "#正文颜色",
+    "heading_color": "#标题颜色",
+    "link_color": "#链接颜色",
+    "code_bg": "#代码背景",
+    "blockquote_border": "#引用边框",
+    "blockquote_bg": "#引用背景色",
+    "font_family": "字体集",
+    "heading_style": "normal",
+    "paragraph_indent": false,
+    "line_height": 1.8
+}}"""
+        prompt = os.environ.get("PROMPT_LAYOUT", default_layout_prompt)
+
+        client = openai.OpenAI(api_key=deepseek_api_key, base_url="https://api.deepseek.com")
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt.format(style_description=style_description)}],
+            max_tokens=500
+        )
+        style_json = response.choices[0].message.content.strip()
+        
+        # 尝试提取 JSON
+        if '```' in style_json:
+            style_json = style_json.split('```')[1]
+            if style_json.startswith('json'):
+                style_json = style_json[4:]
+        
+        custom_theme = json_lib.loads(style_json)
+        
+        # 补充缺失的字段
+        default_theme = THEMES["professional"]
+        for key in default_theme:
+            if key not in custom_theme:
+                custom_theme[key] = default_theme[key]
+        
+        # 临时添加到主题中
+        THEMES["_custom_"] = custom_theme
+        return convert_markdown_to_wechat_html(md_content, "_custom_")
+        
+    except Exception as e:
+        print(f"自定义风格生成失败: {e}")
+        return convert_markdown_to_wechat_html(md_content, "professional")
 
 
 @app.route('/api/themes')
@@ -426,75 +573,6 @@ def get_server_ip():
             "error": str(e)
         }), 500
 
-
-@app.route('/api/generate-cover', methods=['POST'])
-def generate_cover():
-    """生成封面图"""
-    data = request.json
-    title = data.get('title', '')
-    summary = data.get('summary', '')
-    theme = data.get('theme', 'professional')
-    style = data.get('style', '')
-    
-    user_id = request.headers.get('X-User-Id')
-    cfg = load_user_config(user_id)
-    
-    # 使用 AI 生成封面提示词
-    cover_prompt = title
-    if cfg.get("deepseek_api_key") and summary:
-        try:
-            client = openai.OpenAI(
-                api_key=cfg["deepseek_api_key"],
-                base_url="https://api.deepseek.com"
-            )
-            
-            response = client.chat.completions.create(
-                model="deepseek-chat",  # DeepSeek V3.2
-                messages=[{
-                    "role": "user",
-                    "content": f"""根据以下文章信息，生成一个适合作为微信公众号封面图的简短描述（不超过50字，中文）：
-
-标题：{title}
-摘要：{summary}
-风格偏好：{style if style else '专业简约'}
-
-要求：描述应该是视觉化的场景或元素，不要包含文字，只输出描述。"""
-                }],
-                max_tokens=100
-            )
-            cover_prompt = response.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"AI 生成提示词失败: {e}")
-            cover_prompt = f"{title}，{style if style else '专业简约风格'}"
-    
-    # 生成封面图
-    output_dir = str(TEMP_DIR)
-    
-    # 更新 Poe API Key
-    if cfg.get("poe_api_key"):
-        import backend.config as app_config
-        app_config.POE_API_KEY = cfg["poe_api_key"]
-    
-    result = generate_cover_image(title=cover_prompt, theme_name=theme, output_dir=output_dir)
-    
-    if result["success"]:
-        filename = os.path.basename(result["file_path"])
-        return jsonify({
-            "success": True,
-            "image_url": f"/api/cover/{filename}",
-            "prompt": cover_prompt
-        })
-    else:
-        result = generate_fallback_cover(title, theme, output_dir)
-        if result["success"]:
-            filename = os.path.basename(result["file_path"])
-            return jsonify({
-                "success": True,
-                "image_url": f"/api/cover/{filename}",
-                "prompt": cover_prompt,
-                "fallback": True
-            })
-        return jsonify({"success": False, "error": result["error"]}), 500
 
 
 @app.route('/api/cover/<filename>')

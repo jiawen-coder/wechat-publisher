@@ -2047,16 +2047,26 @@
             const progress = addProgress('AI 正在创作完整文章...', '✍️', 90);
 
             try {
-                // 首先获取用户的 API Key
-                const configRes = await apiRequest('/api/config/keys');
+                // 首先获取用户的 API Key 和 动态 Prompts
+                const [configRes, promptRes] = await Promise.all([
+                    apiRequest('/api/config/keys'),
+                    apiRequest('/api/config/prompts')
+                ]);
                 const configData = await configRes.json();
+                const promptData = await promptRes.json();
 
                 if (!configData.deepseek_api_key) {
                     throw new Error('请先在设置中配置 DeepSeek API Key');
                 }
 
                 // 直接在浏览器调用 DeepSeek API（减轻服务器压力）
-                const article = await callDeepSeekFromBrowser(content, configData.deepseek_api_key, progress, styleHint);
+                const article = await callDeepSeekFromBrowser(
+                    content,
+                    configData.deepseek_api_key,
+                    progress,
+                    styleHint,
+                    promptData // 传入动态提示词
+                );
 
                 progress.complete('文章创作完成');
 
@@ -2077,34 +2087,19 @@
             }
         }
 
-        // 直接从浏览器调用 DeepSeek API（支持流式输出）
-        async function callDeepSeekFromBrowser(content, apiKey, progress, styleHint = '') {
-            const inputLength = content.length;
-            let lengthHint = "请将内容扩展成一篇 1500-2500 字的深度文章";
-            if (inputLength >= 200 && inputLength < 500) {
-                lengthHint = "请将内容扩展成一篇 2000-3000 字的完整文章";
-            } else if (inputLength >= 500) {
-                lengthHint = "请将内容改写成一篇不少于 2500 字的完整文章，保留所有要点并适当扩展";
-            }
+        // 直接从浏览器调用 DeepSeek API（支持流式输出，使用简化 Prompt 系统）
+        async function callDeepSeekFromBrowser(content, apiKey, progress, styleHint = '', promptConfig = {}) {
 
-            const styleInstruction = styleHint ? `\n\n## 写作风格要求\n${styleHint}` : '';
+            // 使用动态拉取的文章 Prompt，支持 {content} 和 {style} 占位符
+            const defaultPrompt = `## Role: 资深微信公众号爆款写手 (李继刚风格 1.0)\n\n## Content:\n请基于以下内容进行创作：\n---\n{content}\n---\n\n## Style: {style}`;
+            let systemPrompt = promptConfig.article_prompt || defaultPrompt;
 
-            const systemPrompt = `你是一位资深的微信公众号爆款文章写手，擅长将素材改写成引人入胜、传播力强的优质长文。
+            const finalStyle = styleHint || '专业、有深度、引人入胜';
 
-## 你的任务
-${lengthHint}，确保内容完整、有深度、有价值。${styleInstruction}
-
-## 写作要求
-### 1. 文章结构（必须完整）
-- **标题**：一个吸引眼球的标题（使用 # 一级标题）
-- **引言**：用一个引人入胜的开头抓住读者
-- **正文**：分成 3-5 个清晰的章节，每个章节用 ## 二级标题
-- **结尾**：有力的总结
-
-### 2. 格式规范
-- 使用 Markdown 格式
-- 文章必须完整，从头写到尾
-- 直接输出完整的 Markdown 文章，不要任何解释`;
+            // 替换占位符
+            systemPrompt = systemPrompt
+                .replace('{content}', content)
+                .replace('{style}', finalStyle);
 
             progress.update && progress.update('正在连接 DeepSeek...');
 
@@ -2117,12 +2112,11 @@ ${lengthHint}，确保内容完整、有深度、有价值。${styleInstruction}
                 body: JSON.stringify({
                     model: 'deepseek-chat',
                     messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: `请将以下内容改写成一篇完整的公众号文章：\n\n---\n${content}\n---\n\n请直接输出完整文章：` }
+                        { role: 'user', content: systemPrompt } // 注意：李继刚风格通常建议直接放在 user 中以获得更好遵从性，或者 system
                     ],
                     max_tokens: 8000,
                     temperature: 0.75,
-                    stream: true // 开启流式输出
+                    stream: true
                 })
             });
 

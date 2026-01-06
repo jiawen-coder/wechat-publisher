@@ -29,13 +29,13 @@ def generate_cover_prompt(title: str, theme_name: str = "professional") -> str:
     """
     theme = THEMES.get(theme_name, THEMES["professional"])
     
-    # 根据主题风格生成不同的提示词
+    # 从环境变量读取主题风格提示词
     style_prompts = {
-        "professional": "现代简约商务风格，蓝色渐变背景，科技感，专业干净",
-        "elegant": "优雅文艺风格，紫色调，柔和温暖，艺术感",
-        "vibrant": "活力动感风格，橙色调，明亮热情，几何图形",
-        "dark": "极客暗黑风格，深色背景，霓虹绿色点缀，赛博朋克",
-        "minimal": "极简黑白风格，简洁大方，留白设计，高级感"
+        "professional": os.environ.get("PROMPT_IMAGE_STYLE_PRO", "现代简约商务风格，蓝色渐变背景，科技感，专业干净"),
+        "elegant": os.environ.get("PROMPT_IMAGE_STYLE_ELEGANT", "优雅文艺风格，紫色调，柔和温暖，艺术感"),
+        "vibrant": os.environ.get("PROMPT_IMAGE_STYLE_VIBRANT", "活力动感风格，橙色调，明亮热情，几何图形"),
+        "dark": os.environ.get("PROMPT_IMAGE_STYLE_DARK", "极客暗黑风格，深色背景，霓虹绿色点缀，赛博朋克"),
+        "minimal": os.environ.get("PROMPT_IMAGE_STYLE_MINIMAL", "极简黑白风格，简洁大方，留白设计，高级感")
     }
     
     style = style_prompts.get(theme_name, style_prompts["professional"])
