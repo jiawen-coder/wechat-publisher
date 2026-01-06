@@ -2511,8 +2511,29 @@ ${lengthHint}，确保内容完整、有深度、有价值。
             try {
                 const res = await apiRequest('/api/config');
                 const data = await res.json();
-                // 不自动填充，让用户手动输入
-            } catch (e) { }
+
+                // 显示已配置的状态（脱敏值），让用户知道配置已保存
+                if (data.deepseek_api_key) {
+                    document.getElementById('cfg-deepseek').placeholder = data.deepseek_api_key + ' (已配置)';
+                }
+                if (data.groq_api_key) {
+                    document.getElementById('cfg-groq').placeholder = data.groq_api_key + ' (已配置)';
+                }
+                if (data.poe_api_key) {
+                    document.getElementById('cfg-poe').placeholder = '已配置';
+                }
+                if (data.imgbb_api_key) {
+                    document.getElementById('cfg-imgbb').placeholder = data.imgbb_api_key + ' (已配置)';
+                }
+                if (data.wechat_app_id) {
+                    document.getElementById('cfg-appid').placeholder = data.wechat_app_id + ' (已配置)';
+                }
+                if (data.wechat_app_secret) {
+                    document.getElementById('cfg-secret').placeholder = '*** (已配置)';
+                }
+            } catch (e) {
+                console.error('Load settings error:', e);
+            }
         }
 
         // 加载服务器IP
