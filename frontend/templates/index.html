@@ -2304,35 +2304,64 @@
             // 获取当前上下文
             const context = state.processedContent || state.rawContent || '';
 
-            // 判断是否是修改文章的指令
-            const isEditRequest = /修改|改一下|换|删除|不要|去掉|调整|精简|扩展|加上|添加|改成|重写|重新/i.test(message);
-
-            const progress = addProgress(isEditRequest ? '正在修改文章...' : '正在思考...', '💬', isEditRequest ? 60 : 30);
+            // 判断意图类型
+            const isEditText = /修改|改一下|换|删除|不要|去掉|调整|精简|扩展|加上|添加|改成|重写|重新|内容/i.test(message) && !/图|封面|图片/i.test(message);
+            const isEditCover = /图|封面|图片|重新生成.*封面|换.*封面/i.test(message);
 
             try {
-                // 获取 API Key
                 const configRes = await apiRequest('/api/config/keys');
                 const configData = await configRes.json();
 
                 if (!configData.deepseek_api_key) {
-                    progress.complete('需要配置');
                     addMessage('❌ 请先在设置中配置 DeepSeek API Key');
                     return;
                 }
 
-                if (isEditRequest && context) {
-                    // 修改文章模式：使用流式输出重新生成
-                    const systemPrompt = `你是一个专业的公众号文章编辑。用户会给你一篇文章和修改要求，请按要求修改文章并输出完整的修改后文章。
+                if (isEditCover) {
+                    // ===== 改图片：重新生成封面 =====
+                    addMessage('🎨 正在重新生成封面图...');
+                    await generateCover();
+
+                } else if (isEditText && context) {
+                    // ===== 改文字：右边更新预览，对话框显示摘要 =====
+                    const progress = addProgress('正在修改文章...', '✏️', 60);
+
+                    // 同时调用两个请求：一个改文章，一个生成摘要
+                    const editPrompt = `请按要求修改文章，直接输出修改后的完整文章（Markdown格式），不要解释。
 
 当前文章：
 ---
 ${context}
 ---
 
-用户的修改要求：${message}
+修改要求：${message}`;
 
-请直接输出修改后的完整文章（Markdown 格式），不要解释。`;
+                    const summaryPrompt = `用户要求修改文章："${message}"
+原文约${context.length}字。请用1-2句话简洁说明将如何修改，例如"已删除关于xxx的内容"或"已将开头改为..."。不要超过50字。`;
 
+                    // 先获取修改摘要
+                    const summaryRes = await fetch('https://api.deepseek.com/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${configData.deepseek_api_key}`
+                        },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: [{ role: 'user', content: summaryPrompt }],
+                            max_tokens: 100,
+                            temperature: 0.5
+                        })
+                    });
+
+                    let summaryText = '正在修改中...';
+                    if (summaryRes.ok) {
+                        const summaryData = await summaryRes.json();
+                        summaryText = summaryData.choices[0].message.content.trim();
+                    }
+                    addMessage(`📝 ${summaryText}`);
+
+                    // 流式生成新文章并更新右边预览
                     const response = await fetch('https://api.deepseek.com/chat/completions', {
                         method: 'POST',
                         headers: {
@@ -2341,7 +2370,7 @@ ${context}
                         },
                         body: JSON.stringify({
                             model: 'deepseek-chat',
-                            messages: [{ role: 'user', content: systemPrompt }],
+                            messages: [{ role: 'user', content: editPrompt }],
                             max_tokens: 8000,
                             temperature: 0.7,
                             stream: true
@@ -2350,7 +2379,6 @@ ${context}
 
                     if (!response.ok) throw new Error('API 调用失败');
 
-                    // 流式读取并更新预览
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder('utf-8');
                     let fullContent = '';
@@ -2368,23 +2396,20 @@ ${context}
                                     const data = JSON.parse(line.substring(6));
                                     const delta = data.choices[0].delta.content || '';
                                     fullContent += delta;
-                                    updatePreview(fullContent);
+                                    updatePreview(fullContent);  // 右边预览区更新
                                 } catch (e) { }
                             }
                         }
                     }
 
-                    // 更新状态
                     state.processedContent = fullContent.trim();
                     progress.complete('修改完成');
-                    addMessage(`✅ 文章已按要求修改（${fullContent.replace(/\s/g, '').length} 字）`);
-
-                    // 显示确认按钮
-                    setTimeout(() => showContentConfirm(state.processedContent), 500);
+                    addMessage(`✅ 已更新到右边预览（${fullContent.replace(/\s/g, '').length} 字）`);
 
                 } else {
-                    // 普通问答模式
-                    const contextHint = context ? `\n\n当前文章内容（供参考）：\n${context.substring(0, 1000)}${context.length > 1000 ? '...' : ''}` : '';
+                    // ===== 普通问答 =====
+                    const progress = addProgress('正在思考...', '💬', 20);
+                    const contextHint = context ? `\n当前文章：${context.substring(0, 500)}...` : '';
 
                     const response = await fetch('https://api.deepseek.com/chat/completions', {
                         method: 'POST',
@@ -2395,10 +2420,10 @@ ${context}
                         body: JSON.stringify({
                             model: 'deepseek-chat',
                             messages: [
-                                { role: 'system', content: `你是一个公众号文章助手。用户可能会问你关于文章内容、排版、封面等问题，请简洁地回答。如果用户想修改文章，告诉他可以直接说"帮我修改：xxx"。${contextHint}` },
+                                { role: 'system', content: `你是公众号文章助手。简洁回答问题。如果用户想修改文章，直接说"帮我改xxx"；想换封面说"重新生成封面"。${contextHint}` },
                                 { role: 'user', content: message }
                             ],
-                            max_tokens: 1000,
+                            max_tokens: 500,
                             temperature: 0.7
                         })
                     });
@@ -2406,14 +2431,11 @@ ${context}
                     if (!response.ok) throw new Error('API 调用失败');
 
                     const data = await response.json();
-                    const reply = data.choices[0].message.content;
-
                     progress.complete('回复完成');
-                    addMessage(reply);
+                    addMessage(data.choices[0].message.content);
                 }
 
             } catch (e) {
-                progress.complete('操作失败');
                 addMessage('❌ 操作失败：' + (e.message || '请重试'));
             }
         }
