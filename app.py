@@ -101,9 +101,12 @@ try:
         save_user_config_to_db, 
         is_db_available
     )
-    # 初始化数据库表
-    init_db()
-except ImportError as e:
+    # 初始化数据库表（非阻塞）
+    try:
+        init_db()
+    except Exception as db_err:
+        print(f"Database init failed (non-fatal): {db_err}")
+except Exception as e:
     print(f"Database module not available: {e}")
     is_db_available = lambda: False
     load_user_config_from_db = lambda x: None
