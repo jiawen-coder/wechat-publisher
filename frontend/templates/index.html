@@ -1978,40 +1978,89 @@
 
         async function processWithAI(content) {
             addMessage('收到！让我帮你整理成完整文章...');
-            const progress = addProgress('AI 正在创作完整文章...', '✍️', 60);
+            const progress = addProgress('AI 正在创作完整文章...', '✍️', 90);
 
             try {
-                const res = await apiRequest('/api/rewrite', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
-                });
+                // 首先获取用户的 API Key
+                const configRes = await apiRequest('/api/config/keys');
+                const configData = await configRes.json();
 
-                // 安全解析 JSON
-                let data;
-                try {
-                    data = await res.json();
-                } catch (jsonError) {
-                    console.error('JSON parse error:', jsonError);
-                    throw new Error('服务器响应格式错误，请稍后重试');
+                if (!configData.deepseek_api_key) {
+                    throw new Error('请先在设置中配置 DeepSeek API Key');
                 }
+
+                // 直接在浏览器调用 DeepSeek API（减轻服务器压力）
+                const article = await callDeepSeekFromBrowser(content, configData.deepseek_api_key, progress);
 
                 progress.complete('文章创作完成');
 
-                if (data.success && data.article) {
-                    state.processedContent = data.article;
-                    addMessage(`✅ 文章已完善（${data.word_count} 字）`);
-                    setTimeout(() => showContentConfirm(data.article), 500);
-                } else {
-                    showRetryOption(data.error || 'AI 处理失败', content);
-                }
+                const word_count = article.replace(/\s/g, '').length;
+                state.processedContent = article;
+                addMessage(`✅ 文章已完善（${word_count} 字）`);
+                setTimeout(() => showContentConfirm(article), 500);
+
             } catch (e) {
                 progress.complete('处理失败');
-                // 使用更友好的错误信息
                 const errorMsg = e.message || '网络错误，请检查网络连接';
                 showRetryOption(errorMsg, content);
                 console.error('Rewrite error:', e);
             }
+        }
+
+        // 直接从浏览器调用 DeepSeek API
+        async function callDeepSeekFromBrowser(content, apiKey, progress) {
+            const inputLength = content.length;
+            let lengthHint = "请将内容扩展成一篇 1500-2500 字的深度文章";
+            if (inputLength >= 200 && inputLength < 500) {
+                lengthHint = "请将内容扩展成一篇 2000-3000 字的完整文章";
+            } else if (inputLength >= 500) {
+                lengthHint = "请将内容改写成一篇不少于 2500 字的完整文章，保留所有要点并适当扩展";
+            }
+
+            const systemPrompt = `你是一位资深的微信公众号爆款文章写手，擅长将素材改写成引人入胜、传播力强的优质长文。
+
+## 你的任务
+${lengthHint}，确保内容完整、有深度、有价值。
+
+## 写作要求
+### 1. 文章结构（必须完整）
+- **标题**：一个吸引眼球的标题（使用 # 一级标题）
+- **引言**：用一个引人入胜的开头抓住读者
+- **正文**：分成 3-5 个清晰的章节，每个章节用 ## 二级标题
+- **结尾**：有力的总结
+
+### 2. 格式规范
+- 使用 Markdown 格式
+- 文章必须完整，从头写到尾
+- 直接输出完整的 Markdown 文章，不要任何解释`;
+
+            progress.update && progress.update('正在连接 DeepSeek...');
+
+            const response = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: `请将以下内容改写成一篇完整的公众号文章：\n\n---\n${content}\n---\n\n请直接输出完整文章：` }
+                    ],
+                    max_tokens: 8000,
+                    temperature: 0.75
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('DeepSeek API error:', errorText);
+                throw new Error('DeepSeek API 调用失败，请检查 API Key 是否正确');
+            }
+
+            const data = await response.json();
+            return data.choices[0].message.content.trim();
         }
 
         function showRetryOption(errorMsg, content) {

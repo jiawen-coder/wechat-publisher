@@ -320,6 +320,24 @@ def config_api():
         return jsonify({"success": True, "message": "配置已保存", "user_id": user_id or ""})
 
 
+@app.route('/api/config/keys', methods=['GET'])
+def config_keys_api():
+    """获取完整 API Keys（用于前端直接调用 AI API）"""
+    user_id = request.headers.get('X-User-Id')
+    
+    if not user_id:
+        return jsonify({"error": "请先登录"}), 401
+    
+    cfg = load_user_config(user_id)
+    
+    # 返回完整的 API keys（仅限已登录用户）
+    return jsonify({
+        "deepseek_api_key": cfg.get("deepseek_api_key", ""),
+        "groq_api_key": cfg.get("groq_api_key", ""),
+        "poe_api_key": cfg.get("poe_api_key", "")
+    })
+
+
 @app.route('/api/parse', methods=['POST'])
 def parse_content():
     """解析内容，提取元数据"""
