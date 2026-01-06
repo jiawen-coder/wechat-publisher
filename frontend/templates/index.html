@@ -2118,7 +2118,7 @@ ${lengthHint}，确保内容完整、有深度、有价值。${styleInstruction}
                     model: 'deepseek-chat',
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: `请将以下内容改写成一篇完整的公众号文章：\n\n---\n{content}\n---\n\n请直接输出完整文章：` }
+                        { role: 'user', content: `请将以下内容改写成一篇完整的公众号文章：\n\n---\n${content}\n---\n\n请直接输出完整文章：` }
                     ],
                     max_tokens: 8000,
                     temperature: 0.75,
