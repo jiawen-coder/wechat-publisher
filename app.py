@@ -132,21 +132,30 @@ def load_user_config(user_id: str = None):
     }
     
     if user_id:
-        # 优先从数据库加载
-        db_config = load_user_config_from_db(user_id)
-        if db_config:
-            return {**default_config, **db_config}
+        # 优先从数据库加载（带错误保护）
+        try:
+            db_config = load_user_config_from_db(user_id)
+            if db_config:
+                return {**default_config, **db_config}
+        except Exception as e:
+            print(f"Database load error (falling back to file): {e}")
         
         # fallback 到本地文件
-        user_config_path = get_user_config_path(user_id)
-        if user_config_path.exists():
-            with open(user_config_path, 'r', encoding='utf-8') as f:
-                return {**default_config, **json.load(f)}
+        try:
+            user_config_path = get_user_config_path(user_id)
+            if user_config_path.exists():
+                with open(user_config_path, 'r', encoding='utf-8') as f:
+                    return {**default_config, **json.load(f)}
+        except Exception as e:
+            print(f"File load error: {e}")
     
     # 未登录或用户配置不存在，使用本地配置
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return {**default_config, **json.load(f)}
+    try:
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return {**default_config, **json.load(f)}
+    except Exception as e:
+        print(f"Config file load error: {e}")
     
     return default_config
 
