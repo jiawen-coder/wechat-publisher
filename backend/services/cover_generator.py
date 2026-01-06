@@ -84,6 +84,9 @@ def generate_cover_image(title: str, theme_name: str = "professional",
                 "role": "user",
                 "content": prompt
             }],
+            extra_body={
+                "image_only": True  # 只返回图片
+            },
             timeout=120  # 120 秒超时
         )
         
@@ -181,11 +184,13 @@ def generate_cover_image(title: str, theme_name: str = "professional",
         }
         
     except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"POE API 调用异常: {error_msg}")
         return {
             "success": False,
             "file_path": None,
             "url": None,
-            "error": str(e)
+            "error": error_msg
         }
 
 
