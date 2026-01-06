@@ -307,6 +307,7 @@ def config_api():
             "imgbb_api_key": cfg.get("imgbb_api_key", "")[:10] + "***" if cfg.get("imgbb_api_key") else "",
             "deepseek_api_key": cfg.get("deepseek_api_key", "")[:10] + "***" if cfg.get("deepseek_api_key") else "",
             "groq_api_key": cfg.get("groq_api_key", "")[:10] + "***" if cfg.get("groq_api_key") else "",
+            "poe_api_key": cfg.get("poe_api_key", "")[:10] + "***" if cfg.get("poe_api_key") else "",
             "configured": bool(cfg.get("deepseek_api_key")),  # 主要检查DeepSeek API
             "user_id": user_id or ""
         })
@@ -515,16 +516,26 @@ def generate_cover():
     
     # 2. 调用绘图服务
     output_dir = str(TEMP_DIR)
-    if cfg.get("poe_api_key"):
-        import backend.config as app_config
-        app_config.POE_API_KEY = cfg["poe_api_key"]
     
+    # 检查并打印 POE API Key 状态
+    poe_key = cfg.get("poe_api_key", "")
+    if poe_key:
+        print(f"✓ 已配置 POE API Key: {poe_key[:10]}...")
+        import backend.config as app_config
+        app_config.POE_API_KEY = poe_key
+    else:
+        print("✗ 未配置 POE API Key，将使用 fallback 封面")
+    
+    print(f"正在生成封面图，提示词: {cover_prompt[:50]}...")
     result = generate_cover_image(title=cover_prompt, theme_name=theme, output_dir=output_dir)
-    # ... 后续逻辑保持一致 (正常返回或 fallback)
+    
     if result["success"]:
+        print(f"✓ POE 生成封面成功: {result['file_path']}")
         filename = os.path.basename(result["file_path"])
         return jsonify({"success": True, "image_url": f"/api/cover/{filename}", "prompt": cover_prompt})
     else:
+        print(f"✗ POE 生成封面失败: {result.get('error', '未知错误')}")
+        print("使用 fallback 封面...")
         result = generate_fallback_cover(title, theme, output_dir)
         if result["success"]:
             filename = os.path.basename(result["file_path"])
