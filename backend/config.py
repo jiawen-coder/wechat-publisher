@@ -16,10 +16,10 @@ POE_BASE_URL = "https://api.poe.com/v1"
 IMGBB_API_KEY = "9c68b63f2c97417f3431e7d448dbd409"
 
 # =============================================
-# 微信公众号 API 配置（官方 API）
+# 微信公众号 API 配置（从用户配置加载，这里只是占位符）
 # =============================================
-WECHAT_APP_ID = "wx052d812236258509"
-WECHAT_APP_SECRET = "57596b477b9cdec1853807a7bde7c772"
+WECHAT_APP_ID = ""  # 从用户配置动态加载
+WECHAT_APP_SECRET = ""  # 从用户配置动态加载
 
 # 第三方服务配置（可选）
 WECHAT_API_URL = ""  # 例如：https://wx.limyai.com/api/openapi/wechat-accounts
