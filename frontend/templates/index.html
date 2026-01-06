@@ -1945,9 +1945,9 @@
                         </div>
                     `);
 
-                    // 先用AI完善文章内容，再进行排版
+                    // 【修复】先询问写作风格，再生成
                     setTimeout(() => {
-                        processWithAI(data.content);
+                        showStyleSelection(data.content);
                     }, 800);
                 } else {
                     addMessage(`❌ ${data.error}`);
@@ -2156,19 +2156,44 @@
             return fullContent.trim();
         }
 
-        // 更新预览区
+        // 更新预览区（流式输出时实时渲染 Markdown）
         function updatePreview(content) {
             const previewArea = document.getElementById('preview-area');
             if (previewArea) {
-                // 简单的 Markdown 到 HTML 转换（预览用）
+                // 更完善的 Markdown 到 HTML 转换
                 let html = content
-                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    // 代码块
+                    .replace(/```([\s\S]*?)```/g, '<pre style="background: var(--bg-card); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0;"><code>$1</code></pre>')
+                    // 行内代码
+                    .replace(/`([^`]+)`/g, '<code style="background: var(--bg-card); padding: 2px 6px; border-radius: 4px;">$1</code>')
+                    // 标题
+                    .replace(/^### (.*$)/gim, '<h3 style="font-size: 18px; margin: 20px 0 12px; color: var(--primary-light);">$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2 style="font-size: 22px; margin: 24px 0 14px; color: var(--primary);">$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1 style="font-size: 28px; margin: 0 0 20px; color: var(--text); font-weight: 700;">$1</h1>')
+                    // 加粗和斜体
+                    .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text);">$1</strong>')
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    // 引用
+                    .replace(/^> (.*$)/gim, '<blockquote style="border-left: 3px solid var(--primary); padding-left: 16px; margin: 12px 0; color: var(--text-secondary);">$1</blockquote>')
+                    // 无序列表
+                    .replace(/^- (.*$)/gim, '<li style="margin: 6px 0; padding-left: 8px;">$1</li>')
+                    .replace(/^\* (.*$)/gim, '<li style="margin: 6px 0; padding-left: 8px;">$1</li>')
+                    // 有序列表
+                    .replace(/^\d+\. (.*$)/gim, '<li style="margin: 6px 0; padding-left: 8px;">$1</li>')
+                    // 分割线
+                    .replace(/^---$/gim, '<hr style="border: none; height: 1px; background: var(--border); margin: 24px 0;">')
+                    // 换行
+                    .replace(/\n\n/g, '</p><p style="margin: 14px 0; line-height: 1.8;">')
                     .replace(/\n/g, '<br>');
-                previewArea.innerHTML = `<div style="padding: 16px; line-height: 1.8;">${html}</div>`;
+
+                // 包裹段落
+                html = '<p style="margin: 14px 0; line-height: 1.8;">' + html + '</p>';
+
+                previewArea.innerHTML = `<div style="padding: 20px; font-size: 16px; color: var(--text);">${html}</div>`;
+
+                // 滚动到底部（流式输出时）
+                previewArea.scrollTop = previewArea.scrollHeight;
             }
         }
 
