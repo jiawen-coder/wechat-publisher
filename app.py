@@ -409,6 +409,51 @@ def config_prompts_api():
     })
 
 
+@app.route('/api/convert', methods=['POST'])
+def convert_content():
+    """将 Markdown 转换为公众号 HTML"""
+    data = request.json
+    content = data.get('content', '')
+    theme = data.get('theme', 'professional')
+    
+    if not content:
+        return jsonify({"error": "内容不能为空"}), 400
+    
+    html = convert_markdown_to_wechat_html(content, theme)
+    metadata = extract_metadata(content)
+    
+    return jsonify({
+        "html": html,
+        "title": metadata["title"],
+        "summary": metadata["summary"]
+    })
+
+
+@app.route('/api/convert-custom', methods=['POST'])
+def convert_custom():
+    """使用自定义风格转换"""
+    data = request.json
+    content = data.get('content', '')
+    style_description = data.get('style_description', '')
+    
+    if not content:
+        return jsonify({"error": "内容不能为空"}), 400
+    
+    if not style_description:
+        return jsonify({"error": "请提供风格描述"}), 400
+    
+    user_id = request.headers.get('X-User-Id')
+    cfg = load_user_config(user_id)
+    html = generate_custom_style_html(content, style_description, cfg.get("deepseek_api_key"))
+    metadata = extract_metadata(content)
+    
+    return jsonify({
+        "html": html,
+        "title": metadata["title"],
+        "summary": metadata["summary"]
+    })
+
+
 @app.route('/api/parse', methods=['POST'])
 def parse_content():
     """解析内容，提取元数据"""
@@ -603,10 +648,18 @@ def publish():
     app_config.WECHAT_APP_SECRET = cfg["wechat_app_secret"]
     
     try:
-        publisher = WeChatPublisher(auto_token=True)
+        # 先直接调用 get_access_token 获取详细错误信息
+        token_result = get_access_token(cfg["wechat_app_id"], cfg["wechat_app_secret"])
+        if not token_result["success"]:
+            error_msg = token_result.get("error", "未知错误")
+            print(f"获取 access_token 失败: {error_msg}")
+            return jsonify({"error": f"获取 access_token 失败: {error_msg}"}), 500
+        
+        publisher = WeChatPublisher(auto_token=False)
+        publisher.access_token = token_result["access_token"]
         
         if not publisher.access_token:
-            return jsonify({"error": "获取 access_token 失败"}), 500
+            return jsonify({"error": "获取 access_token 失败: token 为空"}), 500
         
         local_cover_path = None
         if cover_path:
