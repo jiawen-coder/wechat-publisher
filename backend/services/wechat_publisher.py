@@ -484,6 +484,24 @@ class WeChatPublisher:
         Returns:
             发布结果
         """
+        # 【新增】检查草稿箱开关状态，如果关闭则自动开启
+        if self.access_token:
+            print("检查草稿箱开关状态...")
+            switch_result = check_draft_switch(self.access_token)
+            if switch_result["success"]:
+                if not switch_result["is_open"]:
+                    print("草稿箱开关未开启，正在自动开启...")
+                    open_result = open_draft_switch(self.access_token)
+                    if open_result["success"]:
+                        print("✓ 草稿箱开关已开启")
+                    else:
+                        print(f"⚠ 开启草稿箱失败: {open_result['error']}")
+                        # 继续尝试发布，可能是API返回错误但实际已开启
+                else:
+                    print("✓ 草稿箱开关已开启")
+            else:
+                print(f"⚠ 检查草稿箱状态失败: {switch_result['error']}，继续尝试发布...")
+        
         # 如果提供了封面图路径但没有 media_id，先上传封面图
         if cover_image_path and not thumb_media_id:
             print("正在上传封面图...")

@@ -1102,7 +1102,8 @@
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <button class="icon-btn" id="edit-toggle-btn" onclick="toggleEditMode()" title="切换编辑模式"
-                        style="font-size: 14px;">✏️ 编辑</button>
+                        style="font-size: 12px; width: auto; padding: 6px 12px; gap: 4px; white-space: nowrap;">✏️
+                        编辑</button>
                     <button class="icon-btn mobile-only" onclick="closePreview()" style="display: none;">✕</button>
                 </div>
             </div>
@@ -1972,11 +1973,76 @@
 
             addMessage(content.length > 100 ? content.substring(0, 100) + '...' : content, 'user');
 
-            // 所有输入都先经过AI完善
-            await processWithAI(content);
+            // 【新增】先询问写作风格，再生成
+            showStyleSelection(content);
         }
 
-        async function processWithAI(content) {
+        // 风格选择
+        function showStyleSelection(content) {
+            addMessage(`
+                <div style="margin-bottom: 12px;">📝 <strong>选择写作风格</strong></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                    <button class="style-option" onclick="selectStyle('professional', '${encodeURIComponent(content)}')" 
+                        style="padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); cursor: pointer; transition: all 0.2s;">
+                        💼 专业深度
+                    </button>
+                    <button class="style-option" onclick="selectStyle('casual', '${encodeURIComponent(content)}')"
+                        style="padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); cursor: pointer; transition: all 0.2s;">
+                        😊 轻松活泼
+                    </button>
+                    <button class="style-option" onclick="selectStyle('story', '${encodeURIComponent(content)}')"
+                        style="padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); cursor: pointer; transition: all 0.2s;">
+                        📖 故事叙述
+                    </button>
+                    <button class="style-option" onclick="selectStyle('simple', '${encodeURIComponent(content)}')"
+                        style="padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); cursor: pointer; transition: all 0.2s;">
+                        ✨ 简洁精炼
+                    </button>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="custom-style-input" placeholder="或输入自定义风格要求..." 
+                        style="flex: 1; padding: 10px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); outline: none;">
+                    <button onclick="selectStyle('custom', '${encodeURIComponent(content)}')" 
+                        style="padding: 10px 20px; border-radius: 20px; background: var(--primary); color: white; border: none; cursor: pointer;">
+                        开始创作
+                    </button>
+                </div>
+            `);
+            state.pendingContent = content;
+        }
+
+        // 选择风格后开始生成
+        async function selectStyle(style, encodedContent) {
+            const content = decodeURIComponent(encodedContent);
+            let styleHint = '';
+
+            switch (style) {
+                case 'professional':
+                    styleHint = '请用专业、严谨的语言风格，适合商务或技术类文章';
+                    break;
+                case 'casual':
+                    styleHint = '请用轻松、活泼的语言风格，像朋友聊天一样';
+                    break;
+                case 'story':
+                    styleHint = '请用故事叙述的方式，有情节、有画面感';
+                    break;
+                case 'simple':
+                    styleHint = '请用简洁精炼的语言，言简意赅';
+                    break;
+                case 'custom':
+                    const customInput = document.getElementById('custom-style-input');
+                    styleHint = customInput ? customInput.value : '';
+                    if (!styleHint) {
+                        styleHint = '按照内容本身最适合的风格来写';
+                    }
+                    break;
+            }
+
+            addMessage(`已选择风格：${styleHint}`, 'user');
+            await processWithAI(content, styleHint);
+        }
+
+        async function processWithAI(content, styleHint = '') {
             addMessage('收到！让我帮你整理成完整文章...');
             const progress = addProgress('AI 正在创作完整文章...', '✍️', 90);
 
@@ -1990,12 +2056,16 @@
                 }
 
                 // 直接在浏览器调用 DeepSeek API（减轻服务器压力）
-                const article = await callDeepSeekFromBrowser(content, configData.deepseek_api_key, progress);
+                const article = await callDeepSeekFromBrowser(content, configData.deepseek_api_key, progress, styleHint);
 
                 progress.complete('文章创作完成');
 
                 const word_count = article.replace(/\s/g, '').length;
                 state.processedContent = article;
+
+                // 将文章显示到预览区
+                updatePreview(article);
+
                 addMessage(`✅ 文章已完善（${word_count} 字）`);
                 setTimeout(() => showContentConfirm(article), 500);
 
@@ -2007,8 +2077,8 @@
             }
         }
 
-        // 直接从浏览器调用 DeepSeek API
-        async function callDeepSeekFromBrowser(content, apiKey, progress) {
+        // 直接从浏览器调用 DeepSeek API（支持流式输出）
+        async function callDeepSeekFromBrowser(content, apiKey, progress, styleHint = '') {
             const inputLength = content.length;
             let lengthHint = "请将内容扩展成一篇 1500-2500 字的深度文章";
             if (inputLength >= 200 && inputLength < 500) {
@@ -2017,10 +2087,12 @@
                 lengthHint = "请将内容改写成一篇不少于 2500 字的完整文章，保留所有要点并适当扩展";
             }
 
+            const styleInstruction = styleHint ? `\n\n## 写作风格要求\n${styleHint}` : '';
+
             const systemPrompt = `你是一位资深的微信公众号爆款文章写手，擅长将素材改写成引人入胜、传播力强的优质长文。
 
 ## 你的任务
-${lengthHint}，确保内容完整、有深度、有价值。
+${lengthHint}，确保内容完整、有深度、有价值。${styleInstruction}
 
 ## 写作要求
 ### 1. 文章结构（必须完整）
@@ -2046,10 +2118,11 @@ ${lengthHint}，确保内容完整、有深度、有价值。
                     model: 'deepseek-chat',
                     messages: [
                         { role: 'system', content: systemPrompt },
-                        { role: 'user', content: `请将以下内容改写成一篇完整的公众号文章：\n\n---\n${content}\n---\n\n请直接输出完整文章：` }
+                        { role: 'user', content: `请将以下内容改写成一篇完整的公众号文章：\n\n---\n{content}\n---\n\n请直接输出完整文章：` }
                     ],
                     max_tokens: 8000,
-                    temperature: 0.75
+                    temperature: 0.75,
+                    stream: true // 开启流式输出
                 })
             });
 
@@ -2059,8 +2132,50 @@ ${lengthHint}，确保内容完整、有深度、有价值。
                 throw new Error('DeepSeek API 调用失败，请检查 API Key 是否正确');
             }
 
-            const data = await response.json();
-            return data.choices[0].message.content.trim();
+            // 处理流式响应
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let fullContent = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            const delta = data.choices[0].delta.content || '';
+                            fullContent += delta;
+                            // 实时刷新预览
+                            updatePreview(fullContent);
+                        } catch (e) {
+                            // 忽略部分解析错误
+                        }
+                    }
+                }
+            }
+
+            return fullContent.trim();
+        }
+
+        // 更新预览区
+        function updatePreview(content) {
+            const previewArea = document.getElementById('preview-area');
+            if (previewArea) {
+                // 简单的 Markdown 到 HTML 转换（预览用）
+                let html = content
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n/g, '<br>');
+                previewArea.innerHTML = `<div style="padding: 16px; line-height: 1.8;">${html}</div>`;
+            }
         }
 
         function showRetryOption(errorMsg, content) {
@@ -2610,6 +2725,9 @@ ${lengthHint}，确保内容完整、有深度、有价值。
                 preview.contentEditable = 'false';
                 btn.innerHTML = '✏️ 编辑';
                 btn.style.background = '';
+                btn.style.width = 'auto';
+                btn.style.padding = '6px 12px';
+                preview.style.border = "none";
 
                 // 保存编辑后的内容到state
                 const editedContent = preview.innerText || preview.textContent;
@@ -2622,10 +2740,14 @@ ${lengthHint}，确保内容完整、有深度、有价值。
             } else {
                 // 进入编辑模式
                 preview.contentEditable = 'true';
+                preview.focus();
                 btn.innerHTML = '💾 保存';
                 btn.style.background = 'var(--success)';
                 btn.style.color = 'white';
-                preview.focus();
+                btn.style.width = 'auto';
+                btn.style.padding = '6px 12px';
+                preview.style.border = "2px solid var(--primary)";
+                preview.style.borderRadius = "8px";
                 addMessage('✏️ 已进入编辑模式，直接在右侧修改内容，完成后点击"保存"');
             }
         }
