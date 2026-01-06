@@ -648,7 +648,12 @@ def publish():
     app_config.WECHAT_APP_SECRET = cfg["wechat_app_secret"]
     
     try:
-        # 先直接调用 get_access_token 获取详细错误信息
+        # 清除 token 缓存，确保用最新的配置获取
+        from backend.services.wechat_publisher import _token_cache
+        _token_cache["access_token"] = None
+        _token_cache["expires_at"] = 0
+        
+        # 获取 access_token，传入用户配置的 AppID 和 AppSecret
         token_result = get_access_token(cfg["wechat_app_id"], cfg["wechat_app_secret"])
         if not token_result["success"]:
             error_msg = token_result.get("error", "未知错误")
