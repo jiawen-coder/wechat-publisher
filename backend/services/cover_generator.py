@@ -84,10 +84,6 @@ def generate_cover_image(title: str, theme_name: str = "professional",
                 "role": "user",
                 "content": prompt
             }],
-            extra_body={
-                "image_only": True,  # 只返回图片
-                "aspect_ratio": "21:9"  # 最接近 2.35:1 的比例
-            },
             timeout=120  # 120 秒超时
         )
         
