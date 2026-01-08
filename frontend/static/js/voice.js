@@ -6,6 +6,8 @@ let mediaRecorder = null;
 let audioChunks = [];
 
 async function toggleVoiceInput() {
+    if (!checkAuth()) return;
+    
     const btn = document.getElementById('voice-input-btn');
     
     if (mediaRecorder && mediaRecorder.state === 'recording') {

@@ -84,11 +84,18 @@ function expandUploadedContent() {
 }
 
 function triggerFileUpload() {
+    if (!checkAuth()) return;
+    
     const input = document.getElementById('file-input');
     if (input) input.click();
 }
 
 function onFileSelected(event) {
+    if (!checkAuth()) {
+        event.target.value = '';
+        return;
+    }
+    
     const file = event.target.files[0];
     if (file) {
         addMessage(`📎 上传：${file.name}`, 'user');

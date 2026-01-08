@@ -288,6 +288,64 @@ THEMES = {
         "paragraph_indent": False,
         "line_height": 1.9,
     },
+    
+    # ========== 2.0 高级设计风格 ==========
+    "futurism": {
+        "name": "🌌 赛博 2.0",
+        "description": "高度视觉化，荧光描边与科技装饰",
+        "primary_color": "#00f2ff",
+        "secondary_color": "#0a0a0c",
+        "accent_color": "#ff00e5",
+        "text_color": "#e0e0e0",
+        "heading_color": "#00f2ff",
+        "link_color": "#00f2ff",
+        "code_bg": "#16161a",
+        "blockquote_border": "#ff00e5",
+        "blockquote_bg": "#16161a",
+        "font_family": "'Space Grotesk', 'JetBrains Mono', monospace",
+        "heading_style": "futuristic",  # 新增
+        "paragraph_indent": False,
+        "line_height": 1.7,
+        "decorative": True
+    },
+    
+    "magazine": {
+        "name": "📖 艺术杂志",
+        "description": "优雅衬线体，大留白排版",
+        "primary_color": "#1a1a1a",
+        "secondary_color": "#ffffff",
+        "accent_color": "#c19a6b",
+        "text_color": "#333333",
+        "heading_color": "#000000",
+        "link_color": "#c19a6b",
+        "code_bg": "#f9f9f9",
+        "blockquote_border": "#c19a6b",
+        "blockquote_bg": "#fcfaf4",
+        "font_family": "'Noto Serif SC', 'Source Han Serif', Georgia, serif",
+        "heading_style": "magazine",  # 新增
+        "paragraph_indent": True,
+        "line_height": 2.2,
+        "decorative": True
+    },
+    
+    "minimalist_notion": {
+        "name": "📝 精致 Notion",
+        "description": "极致呼吸感，单色精致美学",
+        "primary_color": "#2f2e2b",
+        "secondary_color": "#ffffff",
+        "accent_color": "#ebeced",
+        "text_color": "#37352f",
+        "heading_color": "#1a1a1a",
+        "link_color": "#2563eb",
+        "code_bg": "#f7f6f3",
+        "blockquote_border": "#ebeced",
+        "blockquote_bg": "#f7f6f3",
+        "font_family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        "heading_style": "notion",  # 新增
+        "paragraph_indent": False,
+        "line_height": 1.8,
+        "decorative": True
+    },
 }
 
 # =============================================

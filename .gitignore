@@ -11,9 +11,14 @@ env/
 # 临时文件
 temp/
 *.log
+test_*.py
 
-# 配置文件（包含敏感信息）
+# 配置文件和用户数据（包含敏感信息）
 user_config.json
+data/users/
+data/temp/
+data/uploads/
+data/user_config.json
 
 # IDE
 .vscode/

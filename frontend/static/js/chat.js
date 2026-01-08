@@ -18,6 +18,9 @@ async function sendFreeChat() {
 
     if (!message) return;
     
+    // 检查登录状态
+    if (!checkAuth()) return;
+    
     // 先检查 API Key，不要显示 typing
     let configData;
     try {
