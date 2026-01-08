@@ -137,21 +137,59 @@ async function typeMessage(content) {
 }
 
 async function processWithAI(context, instruction, showInPreview = true) {
-    const systemPrompt = `你是专业的微信公众号写手。
+    // 从后端获取 writer prompt（支持环境变量覆盖）
+    let writerPrompt = '';
+    try {
+        const promptsRes = await fetch('/api/config/prompts');
+        if (promptsRes.ok) {
+            const prompts = await promptsRes.json();
+            writerPrompt = prompts.writer_prompt || '';
+        }
+    } catch (e) {
+        console.log('Failed to fetch writer prompt, using fallback');
+    }
+    
+    // 根据内容长度动态调整字数要求
+    const contentLength = (context || '').length;
+    let lengthHint = '请创作一篇 1500-2500 字的深度文章';
+    if (contentLength > 500) {
+        lengthHint = '请改写成一篇不少于 2500 字的完整文章，保留所有要点并适当扩展';
+    } else if (contentLength > 200) {
+        lengthHint = '请扩展成一篇 2000-3000 字的完整文章';
+    }
+    
+    // 替换 length_hint 占位符
+    if (writerPrompt) {
+        writerPrompt = writerPrompt.replace('{length_hint}', lengthHint);
+    }
+    
+    // 如果有自定义 instruction，追加到 prompt
+    const finalSystemPrompt = writerPrompt || `你写公众号文章，风格像刘润。
 
-【任务】${instruction}
+${lengthHint}
 
-【素材/参考】
-${context || '（无素材，请根据指令创作）'}
+核心风格：
+- 短段落，一两句话一段，节奏感强
+- 故事线推进，用"那是...的一天"、"没想到..."、"于是..."串起来
+- 小标题是问句或判断："网约车司机，一个月赚多少？"、"怎么办？"
+- 用例子说话，抽象道理落到具体场景
+- 结尾有情感升华
 
-【要求】
-- 直接输出文章内容，使用 Markdown 格式
-- 不要输出任何解释
-- 标题用 # 开头
-- 结构清晰，段落分明
-- 1500-2000字`;
+绝对禁止：
+- "一、二、三、四、五、六" 编号章节
+- 每个标题下再分 "1. 2. 3." 小点
+- 满屏 bullet point
+- 大段落（超过3句话要拆开）
+- "综上所述"、"首先其次最后"
 
-    const response = await chatStream([{ role: 'user', content: systemPrompt }], 'write');
+直接输出文章。`;
+    
+    const userContent = instruction + (context ? `\n\n【素材/参考】\n${context}` : '\n\n（无素材，请根据指令创作）');
+
+    const response = await chatStream([
+        { role: 'system', content: finalSystemPrompt },
+        { role: 'user', content: userContent }
+    ], 'write');
 
     if (!response.ok) {
         throw new Error('AI 调用失败');
