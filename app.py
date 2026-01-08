@@ -314,6 +314,9 @@ def load_user_config(user_id: str = None):
         try:
             db_config = load_user_config_from_db(user_id)
             if db_config:
+                # 检查关键字段是否存在
+                poe_key = db_config.get('poe_api_key', '')
+                print(f"📂 从数据库加载配置: user={user_id}, poe_key={'已配置' if poe_key else '未配置'}")
                 return {**default_config, **db_config}
         except Exception as e:
             print(f"Database load error (falling back to file): {e}")
@@ -323,7 +326,10 @@ def load_user_config(user_id: str = None):
             user_config_path = get_user_config_path(user_id)
             if user_config_path.exists():
                 with open(user_config_path, 'r', encoding='utf-8') as f:
-                    return {**default_config, **json.load(f)}
+                    file_config = json.load(f)
+                    poe_key = file_config.get('poe_api_key', '')
+                    print(f"📂 从本地文件加载配置: user={user_id}, poe_key={'已配置' if poe_key else '未配置'}")
+                    return {**default_config, **file_config}
         except Exception as e:
             print(f"File load error: {e}")
     
@@ -335,33 +341,49 @@ def load_user_config(user_id: str = None):
     except Exception as e:
         print(f"Config file load error: {e}")
     
+    print(f"⚠ 使用默认配置: user={user_id}")
     return default_config
 
 
 def save_user_config(config, user_id: str = None):
     """保存用户配置（优先保存到数据库，同时保存本地文件作为备份）"""
+    print(f"💾 保存用户配置: user_id={user_id}, keys={list(config.keys())}")
+    
     if user_id == "guest":
         # 访客配置保存到主配置文件 user_config.json
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=4, ensure_ascii=False)
+            print(f"✓ Guest 配置已保存到文件")
             return True
         except Exception as e:
-            print(f"Guest config save error: {e}")
+            print(f"✗ Guest config save error: {e}")
             return False
 
     if user_id:
         # 优先保存到数据库
+        db_saved = False
         if is_db_available():
-            save_user_config_to_db(user_id, config)
+            db_saved = save_user_config_to_db(user_id, config)
+            if db_saved:
+                print(f"✓ 配置已保存到数据库: {user_id}")
+            else:
+                print(f"✗ 数据库保存失败，将使用本地文件: {user_id}")
+        else:
+            print(f"⚠ 数据库不可用，使用本地文件: {user_id}")
         
         # 同时保存到本地文件作为备份
-        user_config_path = get_user_config_path(user_id)
-        with open(user_config_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
+        try:
+            user_config_path = get_user_config_path(user_id)
+            with open(user_config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            print(f"✓ 配置已保存到本地文件: {user_config_path}")
+        except Exception as e:
+            print(f"✗ 本地文件保存失败: {e}")
     else:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
+        print(f"✓ 配置已保存到默认文件")
 
 
 # ==================== 配置管理（兼容旧接口） ====================
@@ -656,47 +678,88 @@ def generate_cover():
     title = data.get('title', '')
     summary = data.get('summary', '')
     theme = data.get('theme', 'professional')
-    style = data.get('style', '')  # 这里的 style 是封面愿景/自定义描述
+    style = data.get('style', '')  # 用户输入的封面描述/主题关键词
     
     user_id = request.headers.get('X-User-Id')
     cfg = load_user_config(user_id)
     
-    # 1. 获取封面描述 Prompt
-    prompt = get_prompt('cover')
+    # 判断逻辑：
+    # 1. 如果用户明确输入了封面描述（style），以用户输入为主
+    # 2. 如果没有输入，则用 AI 根据文章内容自动生成
     
-    cover_prompt = title
-    if cfg.get("iflow_api_key") and (summary or title):
+    cover_prompt = ""
+    
+    # 用户明确输入了封面描述
+    if style and len(style.strip()) > 0:
+        user_input = style.strip()
+        # 如果用户输入的是具体主题（如"猫咪"），则结合文章主题生成描述
+        if cfg.get("iflow_api_key"):
+            try:
+                client = openai.OpenAI(
+                    api_key=cfg["iflow_api_key"],
+                    base_url="https://apis.iflow.cn/v1"
+                )
+                
+                # 新的 prompt：以用户输入为核心主题
+                messages = [{
+                    "role": "user",
+                    "content": f"""你是一位顶尖视觉设计师。请根据用户指定的封面主题，设计一张公众号封面图的描述词。
+
+用户指定的封面主题：{user_input}
+文章标题（供参考）：{title}
+
+要求：
+1. 以用户指定的主题为核心进行设计
+2. 描述必须具体、视觉化、有设计感
+3. 不要出现文字
+4. 适合作为文章封面，专业美观
+5. 直接输出描述词，不超过 80 字"""
+                }]
+                
+                response = client.chat.completions.create(
+                    model="deepseek-v3",
+                    messages=messages,
+                    max_tokens=200
+                )
+                cover_prompt = response.choices[0].message.content.strip()
+                log_ai_call("/api/cover [用户主题]", messages, cover_prompt, model="deepseek-v3")
+            except Exception as e:
+                print(f"AI 优化描述失败: {e}")
+                cover_prompt = f"{user_input}，专业美观，适合作为文章封面"
+        else:
+            # 没有 AI，直接用用户输入
+            cover_prompt = f"{user_input}，专业美观，适合作为文章封面"
+    
+    # 用户没有输入，根据文章内容自动生成
+    elif cfg.get("iflow_api_key") and (summary or title):
         try:
-            api_base = "https://apis.iflow.cn/v1"
-            model_name = "deepseek-v3"
-            
             client = openai.OpenAI(
                 api_key=cfg["iflow_api_key"],
-                base_url=api_base
+                base_url="https://apis.iflow.cn/v1"
             )
             
+            prompt = get_prompt('cover')
             messages = [{
                 "role": "user",
                 "content": prompt.format(
                     title=title, 
                     summary=summary, 
-                    style=(style if style else '专业简约')
+                    style='专业简约'
                 )
             }]
             
             response = client.chat.completions.create(
-                model=model_name,
+                model="deepseek-v3",
                 messages=messages,
                 max_tokens=200
             )
             response_content = response.choices[0].message.content.strip()
-            log_ai_call("/api/cover [Generate Description]", messages, response_content, model=model_name)
+            log_ai_call("/api/cover [自动生成]", messages, response_content, model="deepseek-v3")
             
-            # 检查是否是 URL 或 Markdown 语法 ![]()
+            # 检查是否是 URL
             import re
             image_url = None
             url_pattern = r'https?://[^\s<>"{}|\\^`\[\]\)]+'
-            # 优先匹配 Markdown 格式 ![] (url)
             markdown_pattern = r'!\[.*?\]\((https?://.*?)\)'
             mk_match = re.search(markdown_pattern, response_content)
             
@@ -709,13 +772,12 @@ def generate_cover():
                         image_url = url
                         break
             
-            if image_url:
-                cover_prompt = image_url # 如果AI直接返回了图片URL，则直接使用
-            else:
-                cover_prompt = response_content # 否则使用AI生成的描述词
+            cover_prompt = image_url if image_url else response_content
         except Exception as e:
             print(f"AI 生成提示词失败: {e}")
-            cover_prompt = f"{title}，{style if style else '专业简约风格'}"
+            cover_prompt = f"{title}，专业简约风格"
+    else:
+        cover_prompt = f"{title}，专业简约风格"
     
     # 2. 调用绘图服务
     output_dir = str(TEMP_DIR)

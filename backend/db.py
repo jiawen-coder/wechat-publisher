@@ -81,24 +81,32 @@ def load_user_config_from_db(user_id: str) -> Optional[Dict[str, Any]]:
 def save_user_config_to_db(user_id: str, config: Dict[str, Any]) -> bool:
     """保存用户配置到数据库"""
     if not user_id:
+        print("DB save: no user_id provided")
         return False
     
     conn = get_db_connection()
     if not conn:
+        print("DB save: no connection available")
         return False
     
     try:
+        config_json = json.dumps(config, ensure_ascii=False)
         with conn.cursor() as cur:
             cur.execute('''
                 INSERT INTO user_configs (user_id, config, updated_at)
                 VALUES (%s, %s, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id) 
                 DO UPDATE SET config = %s, updated_at = CURRENT_TIMESTAMP
-            ''', (user_id, json.dumps(config), json.dumps(config)))
+            ''', (user_id, config_json, config_json))
         conn.commit()
+        # 验证保存是否成功
+        poe_key = config.get('poe_api_key', '')
+        print(f"DB save success: user={user_id}, poe_key={'已配置' if poe_key else '未配置'}, config_size={len(config_json)}")
         return True
     except Exception as e:
-        print(f"Save config error: {e}")
+        print(f"DB save error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
     finally:
         conn.close()

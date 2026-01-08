@@ -50,22 +50,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // ==================== Google 登录 ====================
 
+let googleInitialized = false;
+let loginInProgress = false;
+
 function showGoogleLogin() {
-    // 初始化 Google Sign-In
-    if (typeof google !== 'undefined' && google.accounts) {
-        if (!GOOGLE_CLIENT_ID) {
-            alert('Google 登录未配置，请联系管理员');
-            return;
-        }
+    // 防止重复点击
+    if (loginInProgress) {
+        console.log('登录已在进行中...');
+        return;
+    }
+    
+    if (typeof google === 'undefined' || !google.accounts) {
+        alert('Google 登录服务加载中，请稍后再试...');
+        return;
+    }
+    
+    if (!GOOGLE_CLIENT_ID) {
+        alert('Google 登录未配置，请联系管理员');
+        return;
+    }
+    
+    loginInProgress = true;
+    
+    // 只初始化一次
+    if (!googleInitialized) {
         google.accounts.id.initialize({
             client_id: GOOGLE_CLIENT_ID,
             callback: handleGoogleCredential,
-            auto_select: false
+            auto_select: false,
+            cancel_on_tap_outside: true
         });
-        google.accounts.id.prompt();
-    } else {
-        alert('Google 登录服务加载中，请稍后再试...');
+        googleInitialized = true;
     }
+    
+    // 先取消之前的请求
+    google.accounts.id.cancel();
+    
+    // 延迟一点再发起新请求，避免 FedCM 冲突
+    setTimeout(() => {
+        google.accounts.id.prompt((notification) => {
+            loginInProgress = false;
+            if (notification.isNotDisplayed()) {
+                console.log('Google 登录弹窗未显示:', notification.getNotDisplayedReason());
+                // 如果弹窗被阻止，提示用户
+                if (notification.getNotDisplayedReason() === 'opt_out_or_no_session') {
+                    alert('请先登录您的 Google 账号，或检查浏览器是否阻止了弹窗');
+                }
+            }
+            if (notification.isSkippedMoment()) {
+                console.log('Google 登录被跳过:', notification.getSkippedReason());
+            }
+        });
+    }, 100);
 }
 
 async function handleGoogleCredential(response) {
@@ -293,7 +329,10 @@ async function handleLogout() {
         // 清除 Google 登录状态
         if (typeof google !== 'undefined' && google.accounts) {
             google.accounts.id.disableAutoSelect();
+            google.accounts.id.cancel();
         }
+        googleInitialized = false;
+        loginInProgress = false;
 
         // 清除本地存储
         localStorage.removeItem(USER_STORAGE_KEY);
