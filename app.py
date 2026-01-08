@@ -1196,25 +1196,25 @@ def chat():
 
         if stream:
             def generate():
-                full_content = ""
+                char_count = 0  # 只统计字数，不累积全文（节省内存）
                 try:
                     response = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
                         stream=True,
-                        max_tokens=8000,  # 确保长文章不被截断
-                        timeout=180  # 3分钟超时，长文章需要更多时间
+                        max_tokens=4096,  # Render免费版内存限制
+                        timeout=120
                     )
                     for chunk in response:
                         if chunk.choices and chunk.choices[0].delta.content:
                             content = chunk.choices[0].delta.content
-                            full_content += content
+                            char_count += len(content)
                             yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
                     
-                    # 记录完整回复日志
-                    log_ai_call("/api/chat [STREAM]", messages, full_content, model=model_name)
+                    # 只记录摘要日志，节省内存
+                    print(f"✅ [STREAM] 完成，共 {char_count} 字")
                 except Exception as e:
-                    print(f"Stream error: {str(e)}")
+                    print(f"❌ Stream error: {str(e)}")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     yield "data: [DONE]\n\n"
