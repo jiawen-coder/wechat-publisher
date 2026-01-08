@@ -840,12 +840,23 @@ def generate_custom_style_html(md_content: str, style_description: str, iflow_ap
         log_ai_call("/api/convert-custom [Function]", messages, style_json, model=model_name)
         print(f"[DEBUG generate_custom_style_html] ✅ AI 返回: {style_json[:200]}...")
         
-        # 尝试提取 JSON
-        if '```' in style_json:
-            style_json = style_json.split('```')[1]
-            if style_json.startswith('json'):
-                style_json = style_json[4:]
+        # 尝试提取 JSON（更健壮的处理）
+        import re
         
+        # 方法1：从代码块中提取
+        if '```' in style_json:
+            # 匹配 ```json ... ``` 或 ``` ... ```
+            code_block_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', style_json)
+            if code_block_match:
+                style_json = code_block_match.group(1).strip()
+        
+        # 方法2：如果还不是有效 JSON，尝试找到 { } 之间的内容
+        if not style_json.startswith('{'):
+            json_match = re.search(r'\{[\s\S]*\}', style_json)
+            if json_match:
+                style_json = json_match.group(0)
+        
+        print(f"[DEBUG generate_custom_style_html] 📝 清理后 JSON: {style_json[:100]}...")
         custom_theme = json_lib.loads(style_json)
         print(f"[DEBUG generate_custom_style_html] ✅ 解析成功: {list(custom_theme.keys())}")
         

@@ -50,6 +50,48 @@ def extract_summary(md_content: str, max_length: int = 120) -> str:
     return text
 
 
+def preprocess_markdown_tables(md_content: str) -> str:
+    """
+    预处理 Markdown 内容，修复表格格式问题
+    主要解决：表格行之间有空行导致无法正确解析的问题
+    """
+    lines = md_content.split('\n')
+    result = []
+    in_table = False
+    table_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # 检测表格行（以 | 开头或结尾）
+        is_table_line = stripped.startswith('|') or stripped.endswith('|') or re.match(r'^\|?[\s\-:|]+\|?$', stripped)
+        
+        if is_table_line and stripped:
+            if not in_table:
+                in_table = True
+            table_lines.append(line)
+        elif in_table:
+            if not stripped:
+                # 空行，可能是表格内的空行，先跳过
+                continue
+            else:
+                # 非表格行，输出之前积累的表格
+                if table_lines:
+                    result.extend(table_lines)
+                    result.append('')  # 表格后加空行
+                    table_lines = []
+                in_table = False
+                result.append(line)
+        else:
+            result.append(line)
+    
+    # 处理末尾的表格
+    if table_lines:
+        result.extend(table_lines)
+    
+    return '\n'.join(result)
+
+
 def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professional", custom_style: str = None) -> str:
     """
     将 Markdown 转换为适配微信公众号的精美 HTML
@@ -60,6 +102,9 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     - 侧边距: 内置 padding 保证手机端阅读
     - 字间距: 0.5-1px 提升阅读体验
     """
+    # 预处理：修复表格格式
+    md_content = preprocess_markdown_tables(md_content)
+    
     if isinstance(theme_name, dict):
         theme = theme_name
     else:
@@ -68,10 +113,11 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     # 使用 markdown 库转换基础 HTML
     md = markdown.Markdown(extensions=[
         'extra',
+        'tables',  # 显式启用表格支持
         'codehilite',
         'toc',
-        'nl2br',
         'sane_lists',
+        # 注意：移除 nl2br，因为它会干扰表格解析
     ])
     
     html_content = md.convert(md_content)

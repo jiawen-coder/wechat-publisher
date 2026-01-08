@@ -489,7 +489,15 @@
         .preview-area {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 24px;
+        }
+        
+        /* 预览内容防止溢出 */
+        .preview-area > * {
+            max-width: 100%;
+            overflow-x: hidden;
+            word-wrap: break-word;
         }
 
         .preview-placeholder {
@@ -520,6 +528,22 @@
             border-radius: 12px;
             padding: 24px;
             min-height: 400px;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        
+        /* 预览内容中的所有元素都限制宽度 */
+        .preview-content * {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        /* 确保 section 和 div 不会溢出 */
+        .preview-content section,
+        .preview-content div {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         /* ==================== 进度指示器 ==================== */
@@ -1535,6 +1559,26 @@
         #file-input {
             display: none;
         }
+
+/* 预览区域内的 section 容器（来自 converter.py 生成的 HTML） */
+.preview-area > section {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+}
+
+.preview-area > section * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* 确保预览区域内的图片不会溢出 */
+.preview-area img {
+    max-width: 100% !important;
+    height: auto !important;
+}
 
 /* 文章预览 - 亮色背景 */
 .article-preview {
