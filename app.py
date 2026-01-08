@@ -920,88 +920,69 @@ def generate_cover():
 
 
 def generate_custom_style_html(md_content: str, style_description: str, iflow_api_key: str = None) -> str:
-    """根据用户自定义风格描述，让 AI 直接生成完整的微信公众号 HTML"""
+    """根据用户自定义风格描述生成 HTML（CSS JSON 方案，省内存）"""
     import openai
+    import json as json_lib
     import re
     
     print(f"[DEBUG generate_custom_style_html] 开始处理, style: {style_description}")
-    print(f"[DEBUG generate_custom_style_html] 文章长度: {len(md_content)} 字符")
     print(f"[DEBUG generate_custom_style_html] API Key exists: {bool(iflow_api_key)}")
     
-    # 优先从环境变量获取 API Key
-    api_key = os.environ.get("IFLOW_API_KEY") or iflow_api_key
+    # 优先从用户配置获取，环境变量作为备选
+    api_key = iflow_api_key or os.environ.get("IFLOW_API_KEY")
     
     if not api_key:
         print("[DEBUG generate_custom_style_html] ❌ 无 API Key，使用默认主题")
         return convert_markdown_to_wechat_html(md_content, "professional")
     
     try:
-        # 使用新的 layout_html prompt（支持环境变量覆盖）
-        prompt_template = get_prompt('layout_html')
-        
-        # 如果环境变量中没有设置 PROMPT_LAYOUT_HTML，使用内置默认
-        if not prompt_template:
-            prompt_template = """你是顶级的微信公众号排版设计师。
+        # 获取样式 Prompt（只生成 CSS 配置，不发送文章内容，省内存）
+        prompt = get_prompt('layout')
 
-## 用户风格要求
-{style_description}
-
-## 文章内容（Markdown格式）
-{md_content}
-
-## 任务
-请将上述文章转换为微信公众号富文本 HTML，应用用户描述的风格。
-
-## 输出要求
-1. 直接输出可用于微信公众号的 HTML 代码
-2. 所有样式必须使用内联 style 属性（微信限制，不支持 class）
-3. 不要输出 markdown 代码块标记（如 ```html）或任何解释文字
-4. 确保排版美观、层次清晰、阅读舒适
-5. 标题使用合适的颜色、字号和样式
-6. 段落使用 <section> 或 <p> 包裹，保持适当的行距（line-height: 1.8-2.0）
-7. 根据风格描述调整配色、字体、间距等
-8. 重点内容可使用 <strong> 或特殊背景色强调
-
-直接输出 HTML 代码："""
-
-        prompt = prompt_template.format(
-            style_description=style_description,
-            md_content=md_content
-        )
-
-        print(f"[DEBUG generate_custom_style_html] 🚀 正在调用 AI (iFlow) 生成完整 HTML...")
+        print(f"[DEBUG generate_custom_style_html] 🚀 正在调用 AI (iFlow)...")
         api_base = "https://apis.iflow.cn/v1"
         model_name = "deepseek-v3"
         
         client = openai.OpenAI(api_key=api_key, base_url=api_base)
-        messages = [{"role": "user", "content": prompt}]
+        messages = [{"role": "user", "content": prompt.format(style_description=style_description)}]
         
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
-            max_tokens=8000,  # 增大以支持完整 HTML 输出
-            timeout=120
+            max_tokens=800,  # CSS JSON 只需要少量 token
+            timeout=30
         )
-        html_content = response.choices[0].message.content.strip()
+        style_json = response.choices[0].message.content.strip()
         
         # 记录详细日志
-        log_ai_call("/api/convert-custom [Full HTML]", messages, html_content[:500] + "...", model=model_name)
-        print(f"[DEBUG generate_custom_style_html] ✅ AI 返回 HTML 长度: {len(html_content)}")
+        log_ai_call("/api/convert-custom [CSS JSON]", messages, style_json, model=model_name)
+        print(f"[DEBUG generate_custom_style_html] ✅ AI 返回: {style_json[:200]}...")
         
-        # 清理可能的代码块标记
-        if html_content.startswith('```'):
-            # 移除开头的 ```html 或 ```
-            html_content = re.sub(r'^```(?:html)?\s*\n?', '', html_content)
-            # 移除结尾的 ```
-            html_content = re.sub(r'\n?```\s*$', '', html_content)
+        # 从代码块中提取 JSON
+        if '```' in style_json:
+            code_block_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', style_json)
+            if code_block_match:
+                style_json = code_block_match.group(1).strip()
         
-        # 验证返回的是有效 HTML
-        if '<' in html_content and '>' in html_content:
-            print(f"[DEBUG generate_custom_style_html] ✅ 生成成功")
-            return html_content
-        else:
-            print(f"[DEBUG generate_custom_style_html] ⚠ 返回内容不像 HTML，降级处理")
-            return convert_markdown_to_wechat_html(md_content, "professional")
+        # 如果不是以 { 开头，尝试找到 JSON
+        if not style_json.startswith('{'):
+            json_match = re.search(r'\{[\s\S]*\}', style_json)
+            if json_match:
+                style_json = json_match.group(0)
+        
+        print(f"[DEBUG generate_custom_style_html] 📝 清理后 JSON: {style_json[:100]}...")
+        custom_theme = json_lib.loads(style_json)
+        print(f"[DEBUG generate_custom_style_html] ✅ 解析成功: {list(custom_theme.keys())}")
+        
+        # 补充缺失的字段
+        default_theme = THEMES["professional"]
+        for key in default_theme:
+            if key not in custom_theme:
+                custom_theme[key] = default_theme[key]
+        
+        # 临时添加到主题中
+        THEMES["_custom_"] = custom_theme
+        return convert_markdown_to_wechat_html(md_content, "_custom_")
         
     except Exception as e:
         print(f"[DEBUG generate_custom_style_html] ❌ 自定义风格生成失败: {e}")
@@ -1246,11 +1227,14 @@ def chat():
     # 非 ReAct 模式：直接调用模型（兼容旧逻辑）
     model_name = "deepseek-v3"
     
-    # 构建上下文感知的状态描述（精简以减少内存）
+    # 构建上下文感知的状态描述（包含文章内容摘要）
     context_desc = ""
     if context.get('hasArticle'):
         title_short = context.get('title', '未命名')[:30]
+        content_preview = context.get('contentPreview', '')[:1500]  # 最多1500字
         context_desc = f"\n\n【当前文章】标题: {title_short}, 字数: {context.get('articleLength', 0)}"
+        if content_preview:
+            context_desc += f"\n【文章内容摘要】\n{content_preview}"
     
     print(f"🚀 [聊天直连] 模型：{model_name}，流：{'开启' if stream else '关闭'}，上下文：{'有' if context else '无'}")
     import gc  # 手动垃圾回收

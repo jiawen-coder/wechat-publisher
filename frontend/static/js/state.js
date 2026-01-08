@@ -14,18 +14,21 @@ const state = {
     coverStyle: '',
     chatHistory: [],
     currentStage: 'idle',
-    
-    // 获取上下文
+
+    // 获取上下文（包含文章内容摘要供 AI 理解）
     getContext() {
+        // 取 rawContent 前2000字作为上下文摘要（省内存）
+        const contentPreview = (this.rawContent || this.processedContent || '').slice(0, 2000);
         return {
             hasArticle: !!(this.processedContent || this.rawContent),
-            articleLength: (this.processedContent || '').length,
+            articleLength: (this.processedContent || this.rawContent || '').length,
+            contentPreview: contentPreview,  // 传递实际内容给 AI
             title: this.title || '',
             theme: this.theme,
             hasCover: !!this.coverUrl
         };
     },
-    
+
     // 重置状态
     reset() {
         this.rawContent = '';
