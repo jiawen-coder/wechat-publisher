@@ -29,41 +29,59 @@ WECHAT_API_KEY = ""  # 你的微信 API Key
 # 主题风格配置 - 差异化设计
 # =============================================
 THEMES = {
-    # ========== 深度洞察（首推） ==========
-    "insight": {
-        "name": "📰 深度洞察",
-        "description": "经济学人/财新风格，大留白、克制配色，适合商业深度长文",
+    # ========== 克制系（张小龙哲学） ==========
+    "minimal": {
+        "name": "◯ 极简白",
+        "description": "最克制的表达，只有黑白灰，让内容说话",
         "primary_color": "#1a1a1a",
         "secondary_color": "#ffffff",
-        "accent_color": "#c41e3a",  # 点睛红，克制使用
-        "text_color": "#2d2d2d",
-        "heading_color": "#0d0d0d",
-        "link_color": "#c41e3a",
-        "code_bg": "#f7f7f7",
-        "blockquote_border": "#c41e3a",
+        "accent_color": "#1a1a1a",
+        "text_color": "#333333",
+        "heading_color": "#1a1a1a",
+        "link_color": "#1a1a1a",
+        "code_bg": "#f5f5f5",
+        "blockquote_border": "#e0e0e0",
         "blockquote_bg": "#fafafa",
-        "font_family": "'Noto Serif SC', 'Source Han Serif CN', Georgia, 'Times New Roman', serif",
-        "heading_style": "editorial",  # 新样式：社论风格
-        "paragraph_indent": True,  # 首行缩进，书籍感
-        "line_height": 2.0,  # 大行距，阅读舒适
-        "letter_spacing": 1,  # 字间距
+        "font_family": "-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif",
+        "heading_style": "minimal",  # 极简：无装饰
+        "paragraph_indent": False,
+        "line_height": 2.0,
+        "letter_spacing": 0.5,
     },
     
-    # ========== 商务/专业类 ==========
+    "insight": {
+        "name": "📖 深度阅读",
+        "description": "书籍质感，衬线字体，适合长文深度阅读",
+        "primary_color": "#1a1a1a",
+        "secondary_color": "#fffef8",  # 微微泛黄的纸张色
+        "accent_color": "#8b4513",  # 深棕，像旧书
+        "text_color": "#2d2d2d",
+        "heading_color": "#1a1a1a",
+        "link_color": "#8b4513",
+        "code_bg": "#f5f5f0",
+        "blockquote_border": "#d4c5a9",
+        "blockquote_bg": "#faf8f0",
+        "font_family": "'Noto Serif SC', 'Source Han Serif', Georgia, serif",
+        "heading_style": "editorial",
+        "paragraph_indent": True,
+        "line_height": 2.1,
+        "letter_spacing": 1,
+    },
+    
     "professional": {
-        "name": "💼 商务蓝",
-        "description": "现代商务风，适合技术文章、深度分析",
+        "name": "◆ 商务克制",
+        "description": "专业但不花哨，一抹蓝点睛",
         "primary_color": "#2563eb",
         "secondary_color": "#ffffff",
-        "accent_color": "#3b82f6",
+        "accent_color": "#2563eb",
         "text_color": "#374151",
-        "heading_color": "#1e3a5f",
+        "heading_color": "#1e293b",
         "link_color": "#2563eb",
-        "code_bg": "#f1f5f9",
-        "blockquote_border": "#3b82f6",
-        "blockquote_bg": "#eff6ff",
-        "font_family": "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
-        "heading_style": "border-left",  # 左边框更有设计感
+        "code_bg": "#f8fafc",
+        "blockquote_border": "#2563eb",
+        "blockquote_bg": "#f8fafc",
+        "font_family": "-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif",
+        "heading_style": "minimal",
         "paragraph_indent": False,
         "line_height": 1.9,
     },

@@ -176,7 +176,26 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
                 letter-spacing: 0.5px;
             '''
             
-            if level == 1 and heading_style == 'editorial':
+            if level == 1 and heading_style == 'minimal':
+                # 极简风格大标题 - 无装饰，靠字重和留白
+                h['style'] = f'''
+                    margin: 32px 0 28px 0;
+                    font-size: 24px;
+                    font-weight: 600;
+                    color: {heading_color};
+                    line-height: 1.4;
+                    letter-spacing: 1px;
+                '''.strip().replace('\n', ' ')
+            elif level == 2 and heading_style == 'minimal':
+                # 极简风格二级标题 - 只靠字重区分
+                h['style'] = f'''
+                    margin: 28px 0 16px 0;
+                    font-size: 17px;
+                    font-weight: 600;
+                    color: {heading_color};
+                    line-height: 1.4;
+                '''.strip().replace('\n', ' ')
+            elif level == 1 and heading_style == 'editorial':
                 # 社论风格大标题 - 居中、大气、衬线
                 h['style'] = f'''
                     margin: 40px 0 32px 0;

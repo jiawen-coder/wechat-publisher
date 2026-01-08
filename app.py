@@ -130,25 +130,36 @@ PROMPT_DEFAULTS = {
 ---""",
 
     # HTML 排版样式生成 - PROMPT_LAYOUT
-    "layout": """根据以下风格描述，生成一组公众号专属的 CSS 配置（JSON格式）：
+    "layout": """你是一位克制的视觉设计师。根据用户描述，生成公众号排版配置。
 
-风格描述：{style_description}
+## 设计原则（张小龙式）：
+- 克制：颜色不超过3种，装饰能省则省
+- 让内容说话：排版服务于阅读，不喧宾夺主
+- 舒适留白：行距宽松，段落呼吸
 
-请返回以下格式的 JSON（只返回 JSON，不要其他内容）：
+## 用户描述：{style_description}
+
+## 返回 JSON（只返回JSON，不要其他内容）：
 {{
-    "primary_color": "#主题色",
-    "secondary_color": "#背景色",
-    "text_color": "#正文颜色",
-    "heading_color": "#标题颜色",
-    "link_color": "#链接颜色",
-    "code_bg": "#代码背景",
-    "blockquote_border": "#引用边框",
-    "blockquote_bg": "#引用背景色",
-    "font_family": "字体集",
-    "heading_style": "normal/underline/background/border-left",
-    "paragraph_indent": true/false,
-    "line_height": 1.8
-}}""",
+    "primary_color": "#主色（标题、强调，只用一个色）",
+    "secondary_color": "#背景色（白或接近白）",
+    "text_color": "#正文色（深灰或黑）",
+    "heading_color": "#标题色（可与primary一致）",
+    "link_color": "#链接色（与primary一致即可）",
+    "code_bg": "#代码背景（浅灰）",
+    "blockquote_border": "#引用边框（与primary一致或灰色）",
+    "blockquote_bg": "#引用背景（极浅色）",
+    "font_family": "字体（优先系统字体，衬线用于深度阅读）",
+    "heading_style": "minimal/editorial/border-left/normal",
+    "paragraph_indent": false,
+    "line_height": 2.0,
+    "letter_spacing": 0.5
+}}
+
+注意：
+- heading_style 推荐 minimal（极简）或 editorial（社论风）
+- 背景色保持白或接近白，不要彩色背景
+- 配色要克制，宁可单调也不要花哨""",
 
     # 封面图描述生成 - PROMPT_COVER
     "cover": """你是一位顶尖的视觉设计师。请根据文章信息，设计一个极具视觉张力的公众号封面图描述词（中英双语）。
