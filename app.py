@@ -273,6 +273,34 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 USERS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# ==================== 临时文件清理 ====================
+def cleanup_temp_files(max_age_hours: int = 24):
+    """清理超过指定小时数的临时文件"""
+    import time
+    now = time.time()
+    max_age_seconds = max_age_hours * 3600
+    cleaned = 0
+    
+    for temp_dir in [TEMP_DIR, UPLOADS_DIR]:
+        if not temp_dir.exists():
+            continue
+        for f in temp_dir.iterdir():
+            if f.is_file():
+                try:
+                    file_age = now - f.stat().st_mtime
+                    if file_age > max_age_seconds:
+                        f.unlink()
+                        cleaned += 1
+                except Exception:
+                    pass
+    
+    if cleaned > 0:
+        print(f"🧹 清理了 {cleaned} 个过期临时文件")
+
+# 启动时清理临时文件
+cleanup_temp_files(24)
+
+
 # ==================== 用户管理 ====================
 
 # 尝试导入数据库模块
@@ -519,7 +547,18 @@ def logout():
 def auth_status():
     """获取登录状态"""
     user = None
-    if 'user' in session:
+    
+    # 修复：Google 登录存的是分开的字段，需要重新组合
+    if 'user_id' in session:
+        user = {
+            "id": session.get('user_id'),
+            "email": session.get('user_email', ''),
+            "name": session.get('user_name', 'User'),
+            "picture": session.get('user_picture', ''),
+            "has_config": True  # 登录用户默认有配置
+        }
+    elif 'user' in session:
+        # 兼容旧的 session 格式
         user = session['user']
     
     # 生产环境禁用访客模式，必须登录
@@ -551,6 +590,7 @@ def auth_status():
         "logged_in": True,
         "user": user
     })
+
 
 
 # ==================== API 路由 ====================
@@ -1135,12 +1175,14 @@ def chat():
     # 非 ReAct 模式：直接调用模型（兼容旧逻辑）
     model_name = "deepseek-v3"
     
-    # 构建上下文感知的状态描述
+    # 构建上下文感知的状态描述（精简以减少内存）
     context_desc = ""
     if context.get('hasArticle'):
-        context_desc = f"\n\n【当前文章状态】\n- 标题: {context.get('title', '未命名')}\n- 字数: {context.get('articleLength', 0)}\n- 排版: {context.get('theme', 'professional')}\n- 封面: {'已生成' if context.get('hasCover') else '未生成'}"
+        title_short = context.get('title', '未命名')[:30]
+        context_desc = f"\n\n【当前文章】标题: {title_short}, 字数: {context.get('articleLength', 0)}"
     
-    print(f"🚀 [Chat Direct] Model: {model_name}, Stream: {stream}, Context: {bool(context)}")
+    print(f"🚀 [聊天直连] 模型：{model_name}，流：{'开启' if stream else '关闭'}，上下文：{'有' if context else '无'}")
+    import gc  # 手动垃圾回收
 
     try:
         client = openai.OpenAI(
@@ -1196,23 +1238,31 @@ def chat():
 
         if stream:
             def generate():
+                chunk_count = 0
                 try:
+                    gc.collect()  # 请求前清理内存
                     response = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
                         stream=True,
-                        max_tokens=8000,
-                        timeout=180
+                        max_tokens=4000,  # 降低以减少内存占用
+                        timeout=120
                     )
                     for chunk in response:
                         if chunk.choices and chunk.choices[0].delta.content:
                             content = chunk.choices[0].delta.content
-                            yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
+                            yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]}, ensure_ascii=False)}\n\n"
+                            chunk_count += 1
+                            # 每 50 个 chunk 做一次小垃圾回收
+                            if chunk_count % 50 == 0:
+                                gc.collect(0)  # 只回收第 0 代
                 except Exception as e:
-                    print(f"Stream error: {str(e)}")
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    error_msg = str(e)
+                    print(f"Stream error: {error_msg}")
+                    yield f"data: {json.dumps({'error': error_msg}, ensure_ascii=False)}\n\n"
                 finally:
                     yield "data: [DONE]\n\n"
+                    gc.collect()  # 完成后清理内存
                 
             return app.response_class(
                 generate(), 
