@@ -1,6 +1,6 @@
 """
 Markdown 转 HTML 转换器
-专门适配微信公众号的格式要求
+专门适配微信公众号的格式要求 - 精美排版版
 """
 
 import re
@@ -26,7 +26,6 @@ def extract_title_from_markdown(md_content: str) -> tuple[str, str]:
             break
     
     if not title:
-        # 如果没有找到一级标题，使用第一行非空内容作为标题
         for i, line in enumerate(lines):
             if line.strip():
                 title = line.strip().lstrip('#').strip()
@@ -38,15 +37,12 @@ def extract_title_from_markdown(md_content: str) -> tuple[str, str]:
 
 
 def extract_summary(md_content: str, max_length: int = 120) -> str:
-    """
-    从 Markdown 内容中提取摘要
-    """
-    # 移除 Markdown 语法
-    text = re.sub(r'!\[.*?\]\(.*?\)', '', md_content)  # 移除图片
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)  # 保留链接文字
-    text = re.sub(r'[#*`_~>\-]', '', text)  # 移除 Markdown 符号
-    text = re.sub(r'\n+', ' ', text)  # 换行转空格
-    text = re.sub(r'\s+', ' ', text).strip()  # 合并空格
+    """从 Markdown 内容中提取摘要"""
+    text = re.sub(r'!\[.*?\]\(.*?\)', '', md_content)
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    text = re.sub(r'[#*`_~>\-]', '', text)
+    text = re.sub(r'\n+', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
     
     if len(text) > max_length:
         text = text[:max_length] + '...'
@@ -54,81 +50,9 @@ def extract_summary(md_content: str, max_length: int = 120) -> str:
     return text
 
 
-def get_heading_style(level: int, theme: dict) -> str:
-    """根据主题生成标题样式"""
-    style_type = theme.get('heading_style', 'normal')
-    font_sizes = {1: 26, 2: 22, 3: 19, 4: 17, 5: 15, 6: 14}
-    margins = {1: '36px 0 20px', 2: '30px 0 16px', 3: '24px 0 14px', 
-               4: '20px 0 12px', 5: '16px 0 10px', 6: '14px 0 8px'}
-    
-    base_style = f"""
-        margin: {margins[level]};
-        padding: 0;
-        font-size: {font_sizes[level]}px;
-        font-weight: 700;
-        color: {theme['heading_color']};
-        line-height: 1.4;
-        font-family: {theme['font_family']};
-    """
-    
-    if style_type == 'underline':
-        base_style += f"""
-            padding-bottom: 10px;
-            border-bottom: 2px solid {theme['primary_color']};
-        """
-    elif style_type == 'background':
-        base_style += f"""
-            background: linear-gradient(to right, {theme['primary_color']}15, transparent);
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-left: -16px;
-            margin-right: -16px;
-        """
-    elif style_type == 'border-left':
-        base_style += f"""
-            padding-left: 16px;
-            border-left: 4px solid {theme['primary_color']};
-        """
-    elif style_type == 'futuristic':
-        accent = theme.get('accent_color', theme['primary_color'])
-        base_style += f"""
-            padding: 10px 15px;
-            border: 1px solid {theme['primary_color']};
-            background: rgba(0, 242, 255, 0.05);
-            text-shadow: 0 0 10px {theme['primary_color']}50;
-            clip-path: polygon(0 0, 100% 0, 100% 70%, 95% 100%, 0 100%);
-            box-shadow: inset 0 0 15px {theme['primary_color']}20;
-        """
-    elif style_type == 'magazine':
-        base_style += f"""
-            padding-bottom: 12px;
-            border-bottom: 3px double {theme.get('accent_color', '#333')};
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 30px;
-            text-align: center;
-        """
-    elif style_type == 'notion':
-        base_style += f"""
-            padding: 4px 0;
-            border-bottom: 1px solid {theme.get('accent_color', '#eee')};
-            margin-bottom: 15px;
-        """
-    
-    return base_style.strip().replace('\n', ' ')
-
-
 def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professional", custom_style: str = None) -> str:
     """
-    将 Markdown 转换为适配微信公众号的 HTML
-    
-    Args:
-        md_content: Markdown 内容
-        theme_name: 主题名称
-        custom_style: 用户自定义风格描述（如果提供，会影响生成的样式）
-    
-    Returns:
-        适配公众号的 HTML 字符串
+    将 Markdown 转换为适配微信公众号的精美 HTML
     """
     if isinstance(theme_name, dict):
         theme = theme_name
@@ -137,277 +61,262 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     
     # 使用 markdown 库转换基础 HTML
     md = markdown.Markdown(extensions=[
-        'extra',           # 表格、代码块等
-        'codehilite',      # 代码高亮
-        'toc',             # 目录
-        'nl2br',           # 换行转 <br>
-        'sane_lists',      # 更好的列表处理
+        'extra',
+        'codehilite',
+        'toc',
+        'nl2br',
+        'sane_lists',
     ])
     
     html_content = md.convert(md_content)
-    
-    # 使用 BeautifulSoup 处理 HTML
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # 获取主题配置
-    # 如果是自定义生成的主题，确保获取必要的字段
-    heading_style_type = theme.get('heading_style', 'normal')
-    line_height = theme.get('line_height', 1.8)
+    # 主题配置
+    primary = theme['primary_color']
+    secondary = theme['secondary_color']
+    text_color = theme['text_color']
+    heading_color = theme['heading_color']
+    accent = theme.get('accent_color', primary)
+    line_height = theme.get('line_height', 1.9)
     paragraph_indent = theme.get('paragraph_indent', False)
-    blockquote_bg = theme.get('blockquote_bg', theme['secondary_color'])
+    blockquote_bg = theme.get('blockquote_bg', '#f8fafc')
+    blockquote_border = theme.get('blockquote_border', primary)
+    code_bg = theme.get('code_bg', '#f1f5f9')
+    font_family = theme.get('font_family', "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif")
     
-    # 处理段落
+    # ==================== 段落样式 ====================
     for p in soup.find_all('p'):
-        indent_style = 'text-indent: 2em;' if paragraph_indent else ''
-        p['style'] = f"""
-            margin: 0 0 20px 0;
-            padding: 0;
+        indent = 'text-indent: 2em;' if paragraph_indent else ''
+        p['style'] = f'''
+            margin: 0 0 1.5em 0;
             font-size: 16px;
             line-height: {line_height};
-            color: {theme['text_color']};
-            text-align: justify;
-            font-family: {theme['font_family']};
+            color: {text_color};
             letter-spacing: 0.5px;
-            {indent_style}
-        """.strip().replace('\n', ' ')
+            word-spacing: 2px;
+            {indent}
+        '''.strip().replace('\n', ' ').replace('  ', ' ')
     
-    # 处理标题
+    # ==================== 标题样式 ====================
+    heading_configs = {
+        1: {'size': 24, 'margin': '2em 0 1em', 'weight': 700},
+        2: {'size': 20, 'margin': '2em 0 0.8em', 'weight': 700},
+        3: {'size': 18, 'margin': '1.5em 0 0.6em', 'weight': 600},
+        4: {'size': 16, 'margin': '1.2em 0 0.5em', 'weight': 600},
+        5: {'size': 15, 'margin': '1em 0 0.4em', 'weight': 600},
+        6: {'size': 14, 'margin': '0.8em 0 0.3em', 'weight': 600},
+    }
+    
     for level in range(1, 7):
+        cfg = heading_configs[level]
         for h in soup.find_all(f'h{level}'):
-            h['style'] = get_heading_style(level, theme)
+            if level <= 2:
+                # 一级二级标题：左边框 + 底部装饰线
+                h['style'] = f'''
+                    margin: {cfg['margin']};
+                    font-size: {cfg['size']}px;
+                    font-weight: {cfg['weight']};
+                    color: {heading_color};
+                    line-height: 1.4;
+                    padding: 8px 0 12px 16px;
+                    border-left: 4px solid {primary};
+                    background: linear-gradient(90deg, {primary}08 0%, transparent 100%);
+                    position: relative;
+                '''.strip().replace('\n', ' ')
+            else:
+                # 三级及以下：简洁风格
+                h['style'] = f'''
+                    margin: {cfg['margin']};
+                    font-size: {cfg['size']}px;
+                    font-weight: {cfg['weight']};
+                    color: {heading_color};
+                    line-height: 1.4;
+                '''.strip().replace('\n', ' ')
     
-    # 处理链接
+    # ==================== 链接样式 ====================
     for a in soup.find_all('a'):
-        a['style'] = f"""
-            color: {theme['link_color']};
+        a['style'] = f'''
+            color: {primary};
             text-decoration: none;
-            border-bottom: 1px solid {theme['link_color']}50;
-            word-break: break-all;
-            transition: all 0.2s;
-        """.strip().replace('\n', ' ')
+            border-bottom: 1px solid {primary}40;
+            padding-bottom: 1px;
+        '''.strip().replace('\n', ' ')
     
-    # 处理图片
+    # ==================== 图片样式 ====================
     for img in soup.find_all('img'):
-        img['style'] = """
+        img['style'] = '''
             max-width: 100%;
             height: auto;
             display: block;
-            margin: 20px auto;
+            margin: 1.5em auto;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        """.strip().replace('\n', ' ')
-        # 包裹在 section 中以便更好控制
+        '''.strip().replace('\n', ' ')
+        
         wrapper = soup.new_tag('section')
-        wrapper['style'] = 'text-align: center; margin: 24px 0;'
+        wrapper['style'] = 'text-align: center; margin: 1.5em 0;'
         img.wrap(wrapper)
     
-    # 处理代码块
+    # ==================== 代码块样式 ====================
     for pre in soup.find_all('pre'):
-        pre['style'] = f"""
-            background-color: {theme['code_bg']};
-            padding: 20px;
-            border-radius: 10px;
+        pre['style'] = f'''
+            background: {code_bg};
+            padding: 16px 20px;
+            border-radius: 8px;
             overflow-x: auto;
-            margin: 20px 0;
-            font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+            margin: 1.5em 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 13px;
             line-height: 1.6;
-            border: 1px solid {theme['primary_color']}20;
-        """.strip().replace('\n', ' ')
+            border: 1px solid {primary}15;
+        '''.strip().replace('\n', ' ')
         
-        # 处理代码块内的 code
         for code in pre.find_all('code'):
-            code['style'] = f"""
-                color: {theme['text_color']};
-                font-family: inherit;
-            """.strip().replace('\n', ' ')
+            code['style'] = f'color: {text_color}; font-family: inherit;'
     
-    # 处理行内代码
+    # 行内代码
     for code in soup.find_all('code'):
         if code.parent.name != 'pre':
-            code['style'] = f"""
-                background-color: {theme['code_bg']};
-                padding: 3px 8px;
+            code['style'] = f'''
+                background: {code_bg};
+                padding: 2px 6px;
                 border-radius: 4px;
-                font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+                font-family: 'Monaco', 'Menlo', monospace;
                 font-size: 14px;
-                color: {theme['primary_color']};
-                border: 1px solid {theme['primary_color']}30;
-            """.strip().replace('\n', ' ')
+                color: {primary};
+            '''.strip().replace('\n', ' ')
     
-    # 处理引用块
+    # ==================== 引用块样式（公众号特色） ====================
     for blockquote in soup.find_all('blockquote'):
-        is_decorative = theme.get('decorative', False)
-        if theme_name == "futurism":
-            blockquote_style = f"""
-                margin: 24px 0;
-                padding: 20px;
-                border: 1px solid {theme['blockquote_border']}50;
-                background-color: {theme['blockquote_bg']};
-                border-left: 8px solid {theme['blockquote_border']};
-                position: relative;
-                box-shadow: 0 0 20px {theme['blockquote_border']}20;
-            """
-        elif theme_name == "magazine":
-            blockquote_style = f"""
-                margin: 40px 0;
-                padding: 30px 40px;
-                border: none;
-                background-color: {blockquote_bg};
-                position: relative;
-                text-align: center;
-                border-top: 1px solid {theme['blockquote_border']}30;
-                border-bottom: 1px solid {theme['blockquote_border']}30;
-            """
-        else:
-            blockquote_style = f"""
-                margin: 24px 0;
-                padding: 16px 20px;
-                border-left: 4px solid {theme['blockquote_border']};
-                background-color: {blockquote_bg};
-                border-radius: 0 8px 8px 0;
-                color: {theme['text_color']};
-            """
+        blockquote['style'] = f'''
+            margin: 1.5em 0;
+            padding: 16px 20px 16px 20px;
+            background: linear-gradient(135deg, {blockquote_bg} 0%, {secondary} 100%);
+            border-left: 4px solid {blockquote_border};
+            border-radius: 0 8px 8px 0;
+            position: relative;
+        '''.strip().replace('\n', ' ')
         
-        blockquote['style'] = blockquote_style.strip().replace('\n', ' ')
-        
-        # 处理引用块内的段落
+        # 引用块内段落
         for p in blockquote.find_all('p'):
-            p_style = f"""
+            p['style'] = f'''
                 margin: 0;
-                padding: 0;
-                font-size: 16px;
+                font-size: 15px;
                 line-height: 1.8;
-                color: {theme['text_color']};
+                color: #64748b;
                 font-style: italic;
-                text-indent: 0;
-            """
-            if theme_name == "magazine":
-                p_style += "font-size: 18px; color: #555;"
-            p['style'] = p_style.strip().replace('\n', ' ')
+            '''.strip().replace('\n', ' ')
     
-    # 处理无序列表
+    # ==================== 列表样式 ====================
     for ul in soup.find_all('ul'):
-        ul['style'] = f"""
-            margin: 20px 0;
+        ul['style'] = f'''
+            margin: 1.2em 0;
             padding-left: 0;
             list-style: none;
-            color: {theme['text_color']};
-        """.strip().replace('\n', ' ')
+        '''.strip().replace('\n', ' ')
     
-    # 处理有序列表
     for ol in soup.find_all('ol'):
-        ol['style'] = f"""
-            margin: 20px 0;
-            padding-left: 24px;
-            color: {theme['text_color']};
-        """.strip().replace('\n', ' ')
+        ol['style'] = f'''
+            margin: 1.2em 0;
+            padding-left: 1.5em;
+            color: {text_color};
+        '''.strip().replace('\n', ' ')
     
-    # 处理列表项
+    # 列表项
     for i, li in enumerate(soup.find_all('li')):
-        # 检查是否在无序列表中
         if li.parent.name == 'ul':
-            li['style'] = f"""
-                margin: 12px 0;
+            li['style'] = f'''
+                margin: 0.6em 0;
                 line-height: {line_height};
                 font-size: 16px;
-                color: {theme['text_color']};
-                padding-left: 24px;
+                color: {text_color};
+                padding-left: 1.5em;
                 position: relative;
-            """.strip().replace('\n', ' ')
-            # 添加自定义圆点
+            '''.strip().replace('\n', ' ')
+            
+            # 自定义圆点
             bullet = soup.new_tag('span')
-            bullet['style'] = f"""
+            bullet['style'] = f'''
                 position: absolute;
                 left: 0;
                 top: 0;
-                color: {theme['primary_color']};
-                font-weight: bold;
-            """.strip().replace('\n', ' ')
+                color: {primary};
+                font-size: 8px;
+                line-height: {line_height};
+            '''.strip().replace('\n', ' ')
             bullet.string = '●'
             li.insert(0, bullet)
         else:
-            li['style'] = f"""
-                margin: 12px 0;
+            li['style'] = f'''
+                margin: 0.6em 0;
                 line-height: {line_height};
                 font-size: 16px;
-                color: {theme['text_color']};
-            """.strip().replace('\n', ' ')
+                color: {text_color};
+            '''.strip().replace('\n', ' ')
     
-    # 处理表格
+    # ==================== 表格样式 ====================
     for table in soup.find_all('table'):
-        table['style'] = f"""
+        table['style'] = '''
             width: 100%;
             border-collapse: collapse;
-            margin: 24px 0;
+            margin: 1.5em 0;
             font-size: 14px;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        """.strip().replace('\n', ' ')
+        '''.strip().replace('\n', ' ')
     
     for th in soup.find_all('th'):
-        th['style'] = f"""
-            border: 1px solid {theme['primary_color']}30;
-            padding: 14px 16px;
-            background-color: {theme['primary_color']};
+        th['style'] = f'''
+            padding: 12px 16px;
+            background: {primary};
             color: white;
             text-align: left;
             font-weight: 600;
-        """.strip().replace('\n', ' ')
+            border: none;
+        '''.strip().replace('\n', ' ')
     
     for i, td in enumerate(soup.find_all('td')):
-        row_bg = theme['secondary_color'] if i % 2 == 0 else 'transparent'
-        td['style'] = f"""
-            border: 1px solid {theme['primary_color']}20;
+        bg = '#f8fafc' if i % 2 == 0 else 'white'
+        td['style'] = f'''
             padding: 12px 16px;
-            color: {theme['text_color']};
-            background-color: {row_bg};
-        """.strip().replace('\n', ' ')
+            border-bottom: 1px solid #e2e8f0;
+            color: {text_color};
+            background: {bg};
+        '''.strip().replace('\n', ' ')
     
-    # 处理分割线
+    # ==================== 分割线 ====================
     for hr in soup.find_all('hr'):
-        hr['style'] = f"""
+        hr['style'] = f'''
             border: none;
             height: 1px;
-            background: linear-gradient(to right, transparent, {theme['primary_color']}50, transparent);
-            margin: 32px 0;
-        """.strip().replace('\n', ' ')
+            background: linear-gradient(90deg, transparent, {primary}30, transparent);
+            margin: 2em 0;
+        '''.strip().replace('\n', ' ')
     
-    # 处理加粗
+    # ==================== 加粗/斜体 ====================
     for strong in soup.find_all(['strong', 'b']):
-        strong['style'] = f"""
-            font-weight: 700;
-            color: {theme['heading_color']};
-        """.strip().replace('\n', ' ')
+        strong['style'] = f'font-weight: 700; color: {heading_color};'
     
-    # 处理斜体
     for em in soup.find_all(['em', 'i']):
-        em['style'] = """
-            font-style: italic;
-        """.strip().replace('\n', ' ')
+        em['style'] = 'font-style: italic;'
     
-    # 生成最终 HTML
-    final_html = f"""
-<section style="
-    padding: 24px 20px;
-    background-color: {theme['secondary_color']};
-    font-family: {theme['font_family']};
-    color: {theme['text_color']};
+    # ==================== 最终包装 ====================
+    final_html = f'''<section style="
+    max-width: 100%;
+    padding: 20px;
+    background: {secondary};
+    font-family: {font_family};
+    color: {text_color};
     line-height: {line_height};
+    -webkit-font-smoothing: antialiased;
 ">
 {str(soup)}
-</section>
-""".strip()
+</section>'''.strip()
     
     return final_html
 
 
 def generate_custom_style_html(md_content: str, style_description: str, iflow_api_key: str = None) -> str:
-    """
-    根据用户自定义风格描述生成 HTML
-    使用 AI 来解析风格描述并生成对应的样式
-    """
+    """根据用户自定义风格描述生成 HTML"""
     import openai
     import os
     import json
@@ -416,12 +325,9 @@ def generate_custom_style_html(md_content: str, style_description: str, iflow_ap
         return convert_markdown_to_wechat_html(md_content, "professional")
     
     try:
-        api_base = "https://apis.iflow.cn/v1"
-        model_name = "deepseek-v3"
-        
         client = openai.OpenAI(
             api_key=iflow_api_key,
-            base_url=api_base
+            base_url="https://apis.iflow.cn/v1"
         )
         
         messages = [{
@@ -432,30 +338,28 @@ def generate_custom_style_html(md_content: str, style_description: str, iflow_ap
 请返回以下格式的 JSON（只返回 JSON，不要其他回复）：
 {{
     "primary_color": "#主题主色",
-    "secondary_color": "#辅助色/背景色",
-    "accent_color": "#强调色（高亮）",
+    "secondary_color": "#背景色",
+    "accent_color": "#强调色",
     "text_color": "#正文颜色",
     "heading_color": "#标题颜色",
     "link_color": "#链接颜色",
-    "code_bg": "#代码块背景",
+    "code_bg": "#代码背景",
     "blockquote_border": "#引用边框色",
     "blockquote_bg": "#引用背景色",
     "font_family": "字体栈",
-    "heading_style": "futuristic|magazine|notion|centered",
-    "decorative": "可选的CSS特殊修饰"
+    "line_height": 1.9,
+    "paragraph_indent": false
 }}"""
         }]
         
         response = client.chat.completions.create(
-            model=model_name,
+            model="deepseek-v3",
             messages=messages,
             max_tokens=800
         )
         
         style_json_raw = response.choices[0].message.content.strip()
-        print(f"🤖 [converter.py AI调用] 返回: {style_json_raw[:100]}...")
         
-        # 尝试提取 JSON
         if '```' in style_json_raw:
             style_json = style_json_raw.split('```')[1]
             if style_json.startswith('json'):
@@ -465,8 +369,7 @@ def generate_custom_style_html(md_content: str, style_description: str, iflow_ap
         
         custom_theme = json.loads(style_json)
         
-        # 补充缺失的字段
-        from backend.config import THEMES
+        # 补充缺失字段
         default_theme = THEMES["professional"]
         for key in default_theme:
             if key not in custom_theme:
@@ -475,23 +378,14 @@ def generate_custom_style_html(md_content: str, style_description: str, iflow_ap
         return convert_markdown_to_wechat_html(md_content, custom_theme)
 
     except Exception as e:
-        print(f"❌ 自定义风格生成失败 (converter.py): {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ 自定义风格生成失败: {str(e)}")
         return convert_markdown_to_wechat_html(md_content, "professional")
 
 
 def extract_metadata(md_content: str) -> dict:
-    """
-    从 Markdown 内容中提取元数据
-    
-    Returns:
-        包含 title, summary, images 的字典
-    """
+    """从 Markdown 内容中提取元数据"""
     title, remaining = extract_title_from_markdown(md_content)
     summary = extract_summary(remaining)
-    
-    # 提取所有图片链接
     images = re.findall(r'!\[.*?\]\((.*?)\)', md_content)
     
     return {
@@ -500,46 +394,3 @@ def extract_metadata(md_content: str) -> dict:
         "images": images,
         "content": remaining
     }
-
-
-if __name__ == "__main__":
-    # 测试代码
-    test_md = """
-# 这是一篇测试文章
-
-这是文章的第一段，介绍一些内容。
-
-## 二级标题
-
-这里有一些**加粗文字**和*斜体文字*。
-
-### 代码示例
-
-```python
-def hello():
-    print("Hello, World!")
-```
-
-还有行内代码 `print("test")`。
-
-> 这是一段引用文字
-> 可以有多行
-
-- 列表项 1
-- 列表项 2
-- 列表项 3
-
-1. 有序列表 1
-2. 有序列表 2
-
-| 表头1 | 表头2 |
-|-------|-------|
-| 内容1 | 内容2 |
-
----
-
-文章结束。
-"""
-    
-    result = convert_markdown_to_wechat_html(test_md, "professional")
-    print(result)

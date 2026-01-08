@@ -82,18 +82,21 @@ def generate_cover_image(title: str, theme_name: str = "professional",
             base_url=POE_BASE_URL,
         )
         
-        # 调用 Flux-pro-1.1 生成图片（nano-banana-pro 已废弃）
+        # 调用 nano-banana 生成图片
         # 微信公众号封面图要求：2.35:1 比例
         print(f"正在生成封面图（等待 AI 响应，约需 30 秒）...")
-        print(f"使用模型: Flux-pro-1.1")
+        print(f"使用模型: nano-banana")
         print(f"提示词: {prompt}")
         
         chat = client.chat.completions.create(
-            model="Flux-pro-1.1",
+            model="nano-banana",
             messages=[{
                 "role": "user",
                 "content": prompt
             }],
+            extra_body={
+                "image_only": True
+            },
             timeout=120  # 120 秒超时
         )
         
