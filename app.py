@@ -38,19 +38,17 @@ def get_memory_mb():
     try:
         import resource
         mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        # macOS 返回 bytes，Linux 返回 KB
         if sys.platform == 'darwin':
             return mem / 1024 / 1024
-        else:
-            return mem / 1024
-    except:
+        return mem / 1024
+    except Exception:
         return -1
 
 def log_memory(tag=""):
     """打印内存使用日志"""
     mem = get_memory_mb()
     if mem > 0:
-        print(f"💾 [内存] {tag}: {mem:.1f} MB")
+        print("MEM [%s]: %.1f MB" % (tag, mem))
     return mem
 
 # 添加项目根目录到 Python 路径
@@ -1219,77 +1217,41 @@ def chat():
 
         if stream:
             def generate():
-                char_count = 0  # 只统计字数，不累积全文
-                last_log_count = 0
-                start_time = time.time()
-                finish_reason = None
-                chunk_count = 0
-                
+                char_count = 0
+                last_log = 0
+                t0 = time.time()
+                reason = None
+                chunks = 0
                 try:
-                    # 开始前记录内存
-                    mem_start = log_memory("流式开始前")
-                    print(f"🚀 [STREAM] 开始生成")
-                    print(f"   模型: {model_name}")
-                    print(f"   max_tokens: 4096")
-                    print(f"   timeout: 180s")
-                    
-                    response = client.chat.completions.create(
+                    mem0 = log_memory("stream_start")
+                    print("[STREAM] model=%s max_tokens=4096 timeout=180" % model_name)
+                    resp = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
                         stream=True,
                         max_tokens=4096,
                         timeout=180
                     )
-                    
-                    for chunk in response:
-                        chunk_count += 1
-                        
+                    for chunk in resp:
+                        chunks += 1
                         if chunk.choices and chunk.choices[0].delta.content:
-                            content = chunk.choices[0].delta.content
-                            char_count += len(content)
-                            # 立即 yield，不存储
-                            yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
-                            
-                            # 每500字打印进度和内存
-                            if char_count - last_log_count >= 500:
-                                elapsed = time.time() - start_time
-                                mem_now = get_memory_mb()
-                                print(f"   📝 {char_count}字 | {elapsed:.1f}s | {mem_now:.1f}MB | chunks:{chunk_count}")
-                                last_log_count = char_count
-                        
-                        # 记录结束原因
+                            c = chunk.choices[0].delta.content
+                            char_count += len(c)
+                            yield "data: %s\n\n" % json.dumps({'choices': [{'delta': {'content': c}}]})
+                            if char_count - last_log >= 500:
+                                print("[STREAM] %d chars, %.1fs, chunks=%d" % (char_count, time.time()-t0, chunks))
+                                last_log = char_count
                         if chunk.choices and chunk.choices[0].finish_reason:
-                            finish_reason = chunk.choices[0].finish_reason
-                    
-                    # 完成
-                    elapsed = time.time() - start_time
-                    mem_end = log_memory("流式完成后")
-                    print(f"✅ [STREAM] 完成!")
-                    print(f"   总字数: {char_count}")
-                    print(f"   总chunks: {chunk_count}")
-                    print(f"   耗时: {elapsed:.1f}s")
-                    print(f"   finish_reason: {finish_reason}")
-                    print(f"   内存变化: {mem_start:.1f}MB → {mem_end:.1f}MB")
-                    
-                    # 主动清理
+                            reason = chunk.choices[0].finish_reason
+                    mem1 = log_memory("stream_end")
+                    print("[STREAM] DONE: %d chars, %.1fs, reason=%s, mem=%.1f->%.1f" % (char_count, time.time()-t0, reason, mem0, mem1))
                     gc.collect()
-                    
                 except Exception as e:
-                    elapsed = time.time() - start_time
-                    mem_err = get_memory_mb()
-                    print(f"❌ [STREAM] 错误!")
-                    print(f"   已生成: {char_count}字")
-                    print(f"   已处理chunks: {chunk_count}")
-                    print(f"   耗时: {elapsed:.1f}s")
-                    print(f"   当前内存: {mem_err:.1f}MB")
-                    print(f"   错误类型: {type(e).__name__}")
-                    print(f"   错误详情: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    print("[STREAM] ERROR: %d chars, %.1fs, %s: %s" % (char_count, time.time()-t0, type(e).__name__, str(e)))
+                    yield "data: %s\n\n" % json.dumps({'error': str(e)})
                 finally:
                     yield "data: [DONE]\n\n"
-                    gc.collect()  # 清理内存
+                    gc.collect()
                 
             return app.response_class(
                 generate(), 
