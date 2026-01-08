@@ -32,19 +32,20 @@ THEMES = {
     # ========== 商务/专业类 ==========
     "professional": {
         "name": "💼 商务蓝",
-        "description": "蓝色主色调，适合技术文章、深度分析",
-        "primary_color": "#1a73e8",
-        "secondary_color": "#f8f9fa",
-        "text_color": "#202124",
-        "heading_color": "#1a73e8",
-        "link_color": "#1a73e8",
-        "code_bg": "#f1f3f4",
-        "blockquote_border": "#1a73e8",
-        "blockquote_bg": "#e8f0fe",
-        "font_family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        "heading_style": "normal",  # normal, underline, background, border-left
+        "description": "现代商务风，适合技术文章、深度分析",
+        "primary_color": "#2563eb",
+        "secondary_color": "#ffffff",
+        "accent_color": "#3b82f6",
+        "text_color": "#374151",
+        "heading_color": "#1e3a5f",
+        "link_color": "#2563eb",
+        "code_bg": "#f1f5f9",
+        "blockquote_border": "#3b82f6",
+        "blockquote_bg": "#eff6ff",
+        "font_family": "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif",
+        "heading_style": "border-left",  # 左边框更有设计感
         "paragraph_indent": False,
-        "line_height": 1.8,
+        "line_height": 1.9,
     },
     
     "corporate": {

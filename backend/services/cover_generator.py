@@ -67,26 +67,33 @@ def generate_cover_image(title: str, theme_name: str = "professional",
     prompt = generate_cover_prompt(title, theme_name)
     
     try:
+        # 检查 POE API Key
+        if not POE_API_KEY:
+            return {
+                "success": False,
+                "file_path": None,
+                "url": None,
+                "error": "未配置 POE API Key"
+            }
+        
         # 初始化 OpenAI 客户端（使用 Poe API）
         client = openai.OpenAI(
             api_key=POE_API_KEY,
             base_url=POE_BASE_URL,
         )
         
-        # 调用 nano-banana-pro 生成图片
+        # 调用 Flux-pro-1.1 生成图片（nano-banana-pro 已废弃）
         # 微信公众号封面图要求：2.35:1 比例
         print(f"正在生成封面图（等待 AI 响应，约需 30 秒）...")
+        print(f"使用模型: Flux-pro-1.1")
         print(f"提示词: {prompt}")
         
         chat = client.chat.completions.create(
-            model="nano-banana-pro",
+            model="Flux-pro-1.1",
             messages=[{
                 "role": "user",
                 "content": prompt
             }],
-            extra_body={
-                "image_only": True  # 只返回图片
-            },
             timeout=120  # 120 秒超时
         )
         

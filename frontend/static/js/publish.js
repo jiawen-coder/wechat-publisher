@@ -8,6 +8,16 @@ async function publishArticle() {
         return;
     }
     
+    // 检查是否有封面图
+    if (!state.coverUrl) {
+        addMessage('⚠️ 发布公众号需要封面图，正在生成...');
+        await doGenerateCover();
+        if (!state.coverUrl) {
+            addMessage('❌ 封面图生成失败，请重试或手动上传');
+            return;
+        }
+    }
+    
     if (state.isGenerating) return;
     setGeneratingState(true);
     
@@ -17,7 +27,8 @@ async function publishArticle() {
         const data = await publishToDraft(
             state.title || '未命名文章',
             state.htmlContent,
-            state.coverUrl
+            state.coverUrl,
+            state.summary || ''
         );
         
         if (data.success) {

@@ -98,14 +98,15 @@ async function transcribeVoice(audioBlob) {
     return res.json();
 }
 
-async function publishToDraft(title, content, coverUrl) {
+async function publishToDraft(title, content, coverUrl, summary = '') {
     const res = await apiRequest('/api/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             title,
             content,
-            thumb_url: coverUrl
+            summary,
+            cover_path: coverUrl  // 后端需要的是 cover_path
         })
     });
     return res.json();
