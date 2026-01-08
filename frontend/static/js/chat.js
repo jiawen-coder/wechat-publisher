@@ -183,7 +183,7 @@ ${lengthHint}
 - "综上所述"、"首先其次最后"
 
 直接输出文章。`;
-    
+
     const userContent = instruction + (context ? `\n\n【素材/参考】\n${context}` : '\n\n（无素材，请根据指令创作）');
 
     const response = await chatStream([

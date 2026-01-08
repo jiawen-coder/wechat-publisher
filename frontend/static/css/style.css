@@ -1578,7 +1578,7 @@
 .preview-area img {
     max-width: 100% !important;
     height: auto !important;
-}
+        }
 
 /* 文章预览 - 亮色背景 */
 .article-preview {

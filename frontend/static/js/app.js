@@ -112,7 +112,7 @@ async function handleGoogleCredential(response) {
             credentials: 'include',
             body: JSON.stringify({ credential: response.credential })
         });
-
+    
         const data = await res.json();
 
         if (data.success) {

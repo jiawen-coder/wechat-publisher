@@ -22,7 +22,8 @@ import sys
 import json
 import uuid
 import hashlib
-import resource
+import gc
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -31,11 +32,26 @@ from flask_cors import CORS
 import openai
 import requests
 
-def log_mem(tag=""):
-    """打印内存使用(MB)"""
-    usage = resource.getrusage(resource.RUSAGE_SELF)
-    mb = usage.ru_maxrss / 1024 / 1024 if sys.platform == 'darwin' else usage.ru_maxrss / 1024
-    print(f"[MEM] {tag}: {mb:.1f}MB")
+# ==================== 内存监控工具 ====================
+def get_memory_mb():
+    """获取当前进程内存使用量 (MB)"""
+    try:
+        import resource
+        mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # macOS 返回 bytes，Linux 返回 KB
+        if sys.platform == 'darwin':
+            return mem / 1024 / 1024
+        else:
+            return mem / 1024
+    except:
+        return -1
+
+def log_memory(tag=""):
+    """打印内存使用日志"""
+    mem = get_memory_mb()
+    if mem > 0:
+        print(f"💾 [内存] {tag}: {mem:.1f} MB")
+    return mem
 
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1203,18 +1219,20 @@ def chat():
 
         if stream:
             def generate():
-                import time
-                import gc
-                
-                char_count = 0  # 只统计字数，绝不累积全文
+                char_count = 0  # 只统计字数，不累积全文
+                last_log_count = 0
                 start_time = time.time()
-                last_log = 0
                 finish_reason = None
-                
-                log_mem("流式开始")
-                print(f"🚀 [STREAM] 开始 model={model_name} max_tokens=4096")
+                chunk_count = 0
                 
                 try:
+                    # 开始前记录内存
+                    mem_start = log_memory("流式开始前")
+                    print(f"🚀 [STREAM] 开始生成")
+                    print(f"   模型: {model_name}")
+                    print(f"   max_tokens: 4096")
+                    print(f"   timeout: 180s")
+                    
                     response = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
@@ -1224,36 +1242,54 @@ def chat():
                     )
                     
                     for chunk in response:
-                        # 提取内容，立即发送，不存储
+                        chunk_count += 1
+                        
                         if chunk.choices and chunk.choices[0].delta.content:
                             content = chunk.choices[0].delta.content
                             char_count += len(content)
+                            # 立即 yield，不存储
                             yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
                             
-                            # 每1000字打印进度
-                            if char_count - last_log >= 1000:
+                            # 每500字打印进度和内存
+                            if char_count - last_log_count >= 500:
                                 elapsed = time.time() - start_time
-                                log_mem(f"已生成{char_count}字")
-                                print(f"   📝 {char_count}字 {elapsed:.0f}s")
-                                last_log = char_count
+                                mem_now = get_memory_mb()
+                                print(f"   📝 {char_count}字 | {elapsed:.1f}s | {mem_now:.1f}MB | chunks:{chunk_count}")
+                                last_log_count = char_count
                         
                         # 记录结束原因
                         if chunk.choices and chunk.choices[0].finish_reason:
                             finish_reason = chunk.choices[0].finish_reason
                     
+                    # 完成
                     elapsed = time.time() - start_time
-                    print(f"✅ [STREAM] 完成 {char_count}字 {elapsed:.0f}s reason={finish_reason}")
+                    mem_end = log_memory("流式完成后")
+                    print(f"✅ [STREAM] 完成!")
+                    print(f"   总字数: {char_count}")
+                    print(f"   总chunks: {chunk_count}")
+                    print(f"   耗时: {elapsed:.1f}s")
+                    print(f"   finish_reason: {finish_reason}")
+                    print(f"   内存变化: {mem_start:.1f}MB → {mem_end:.1f}MB")
+                    
+                    # 主动清理
+                    gc.collect()
                     
                 except Exception as e:
                     elapsed = time.time() - start_time
-                    print(f"❌ [STREAM] 错误 {char_count}字 {elapsed:.0f}s")
-                    print(f"❌ [STREAM] {type(e).__name__}: {str(e)[:200]}")
+                    mem_err = get_memory_mb()
+                    print(f"❌ [STREAM] 错误!")
+                    print(f"   已生成: {char_count}字")
+                    print(f"   已处理chunks: {chunk_count}")
+                    print(f"   耗时: {elapsed:.1f}s")
+                    print(f"   当前内存: {mem_err:.1f}MB")
+                    print(f"   错误类型: {type(e).__name__}")
+                    print(f"   错误详情: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
-                    
                 finally:
                     yield "data: [DONE]\n\n"
-                    log_mem("流式结束")
-                    gc.collect()  # 强制回收
+                    gc.collect()  # 清理内存
                 
             return app.response_class(
                 generate(), 
@@ -1514,7 +1550,6 @@ def upload_image_file():
 # ==================== 主入口 ====================
 
 if __name__ == '__main__':
-    log_mem("启动")
     print("=" * 50)
     print("📝 微信公众号文章发布助手")
     print("=" * 50)
@@ -1524,6 +1559,3 @@ if __name__ == '__main__':
     print("=" * 50)
     
     app.run(host='0.0.0.0', port=5000, debug=True)
-
-# Gunicorn 启动时打印
-log_mem("应用加载")

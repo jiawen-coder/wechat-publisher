@@ -328,8 +328,8 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
                 border-left: 3px solid {blockquote_border};
                 border-radius: 0 6px 6px 0;
             '''.strip().replace('\n', ' ')
-            
-            for p in blockquote.find_all('p'):
+        
+        for p in blockquote.find_all('p'):
                 p['style'] = f'''
                     margin: 0 0 8px 0;
                     font-size: 14px;
@@ -455,14 +455,14 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
         background: {secondary};
         font-family: {font_family};
         color: {text_color};
-        line-height: {line_height};
+    line-height: {line_height};
         font-size: 15px;
         letter-spacing: 0.5px;
         word-break: break-word;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-    ">
-    {str(soup)}
+">
+{str(soup)}
     </section>'''.strip()
     
     return final_html
