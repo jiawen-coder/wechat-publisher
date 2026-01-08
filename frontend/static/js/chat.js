@@ -46,7 +46,7 @@ async function sendFreeChat() {
     const typingMsg = addTypingIndicator();
 
     try {
-        const recentHistory = state.chatHistory.slice(-10).map(h => ({
+        const recentHistory = state.chatHistory.slice(-20).map(h => ({
             role: h.role,
             content: h.content
         }));
