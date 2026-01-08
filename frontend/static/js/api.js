@@ -91,7 +91,7 @@ async function uploadFile(formData) {
 async function transcribeVoice(audioBlob) {
     const formData = new FormData();
     formData.append('audio', audioBlob, 'recording.webm');
-    const res = await apiRequest('/api/transcribe', {
+    const res = await apiRequest('/api/speech-to-text', {
         method: 'POST',
         body: formData
     });

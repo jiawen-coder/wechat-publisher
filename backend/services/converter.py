@@ -193,7 +193,7 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
             background: linear-gradient(135deg, {blockquote_bg} 0%, {secondary} 100%);
             border-left: 4px solid {blockquote_border};
             border-radius: 0 8px 8px 0;
-            position: relative;
+                position: relative;
         '''.strip().replace('\n', ' ')
         
         # 引用块内段落

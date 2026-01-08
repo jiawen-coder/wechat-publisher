@@ -37,7 +37,7 @@ async function loadSettings() {
                 if (config[key].includes('***')) {
                     input.placeholder = '已配置（输入新值覆盖）';
                 } else {
-                    input.value = config[key];
+                input.value = config[key];
                 }
             }
         });
@@ -72,7 +72,7 @@ async function saveSettings() {
         
         if (data.success) {
             addMessage('✅ 设置已保存' + (state.user ? '（已关联到你的账号）' : ''));
-            closeSettings();
+        closeSettings();
         } else {
             throw new Error(data.error || '保存失败');
         }

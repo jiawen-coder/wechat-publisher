@@ -375,12 +375,12 @@ function showThemeSelector() {
                         <button class="theme-chip" onclick="selectAndApplyTheme('${t.id}')">${t.name}</button>
                     `).join('')}
                 </div>
-                <div style="display:flex; gap:8px;">
-                    <input type="text" id="custom-style-input" 
+                <div style="display:flex; gap:8px;" id="custom-style-row">
+                    <input type="text" class="custom-style-input" 
                         placeholder="或输入自定义风格..." 
                         style="flex:1; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:10px 12px; color:white; outline:none; font-size:13px;"
-                        onkeypress="if(event.key==='Enter')applyCustomStyle()">
-                    <button onclick="applyCustomStyle()" 
+                        onkeypress="if(event.key==='Enter')applyCustomStyle(this)">
+                    <button onclick="applyCustomStyle(this.previousElementSibling)" 
                         style="background:var(--primary); color:white; border:none; border-radius:8px; padding:10px 14px; cursor:pointer; font-size:13px;">
                         应用
                     </button>
@@ -395,8 +395,13 @@ function showThemeSelector() {
 }
 
 // 应用自定义风格
-async function applyCustomStyle() {
-    const input = document.getElementById('custom-style-input');
+async function applyCustomStyle(inputEl) {
+    // 优先使用传入的 input，否则查找最后一个
+    let input = inputEl;
+    if (!input) {
+        const inputs = document.querySelectorAll('.custom-style-input');
+        input = inputs.length > 0 ? inputs[inputs.length - 1] : null;
+    }
     const styleDesc = input?.value?.trim();
     if (!styleDesc) {
         addMessage('请输入风格描述');

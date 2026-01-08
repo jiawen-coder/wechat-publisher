@@ -724,13 +724,11 @@ def generate_cover():
     poe_key = cfg.get("poe_api_key", "")
     if poe_key:
         print(f"✓ 已配置 POE API Key: {poe_key[:10]}...")
-        import backend.config as app_config
-        app_config.POE_API_KEY = poe_key
     else:
         print("✗ 未配置 POE API Key，将使用 fallback 封面")
     
     print(f"正在生成封面图，提示词: {cover_prompt[:50]}...")
-    result = generate_cover_image(title=cover_prompt, theme_name=theme, output_dir=output_dir)
+    result = generate_cover_image(title=cover_prompt, theme_name=theme, output_dir=output_dir, poe_api_key=poe_key)
     
     if result["success"]:
         print(f"✓ POE 生成封面成功: {result['file_path']}")

@@ -90,7 +90,7 @@ async function handleGoogleCredential(response) {
             addMessage(`👋 欢迎回来，${data.user.name}！${data.user.has_config ? '已加载你的配置。' : '请在设置中配置 API Key。'}`);
         } else {
             alert('登录失败: ' + data.error);
-        }
+    }
     } catch (e) {
         console.error('登录失败:', e);
         alert('登录失败，请重试');
@@ -297,9 +297,9 @@ async function handleLogout() {
 
         // 清除本地存储
         localStorage.removeItem(USER_STORAGE_KEY);
-        localStorage.removeItem('userId');
+    localStorage.removeItem('userId');
 
-        state.user = null;
+    state.user = null;
         state.userId = null;
         updateAuthUI(false);
 
@@ -313,7 +313,7 @@ async function handleLogout() {
         // 强制清除并刷新
         localStorage.removeItem(USER_STORAGE_KEY);
         localStorage.removeItem('userId');
-        location.reload();
+    location.reload();
     }
 }
 

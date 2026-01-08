@@ -47,14 +47,15 @@ def generate_cover_prompt(title: str, theme_name: str = "professional") -> str:
 
 
 def generate_cover_image(title: str, theme_name: str = "professional", 
-                         output_dir: str = "temp") -> dict:
+                         output_dir: str = "temp", poe_api_key: str = None) -> dict:
     """
-    使用 nano-banana-pro 生成封面图
+    使用 nano-banana 生成封面图
     
     Args:
         title: 文章标题
         theme_name: 主题名称
         output_dir: 输出目录
+        poe_api_key: POE API Key (优先使用传入的值)
     
     Returns:
         包含生成结果的字典 {"success": bool, "file_path": str, "error": str}
@@ -66,9 +67,12 @@ def generate_cover_image(title: str, theme_name: str = "professional",
     # 生成提示词
     prompt = generate_cover_prompt(title, theme_name)
     
+    # 使用传入的 API Key 或全局配置
+    api_key = poe_api_key or POE_API_KEY
+    
     try:
         # 检查 POE API Key
-        if not POE_API_KEY:
+        if not api_key:
             return {
                 "success": False,
                 "file_path": None,
@@ -78,7 +82,7 @@ def generate_cover_image(title: str, theme_name: str = "professional",
         
         # 初始化 OpenAI 客户端（使用 Poe API）
         client = openai.OpenAI(
-            api_key=POE_API_KEY,
+            api_key=api_key,
             base_url=POE_BASE_URL,
         )
         
