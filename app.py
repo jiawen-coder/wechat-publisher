@@ -22,8 +22,6 @@ import sys
 import json
 import uuid
 import hashlib
-import gc
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -31,25 +29,6 @@ from flask import Flask, request, jsonify, send_from_directory, render_template,
 from flask_cors import CORS
 import openai
 import requests
-
-# ==================== 内存监控工具 ====================
-def get_memory_mb():
-    """获取当前进程内存使用量 (MB)"""
-    try:
-        import resource
-        mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        if sys.platform == 'darwin':
-            return mem / 1024 / 1024
-        return mem / 1024
-    except Exception:
-        return -1
-
-def log_memory(tag=""):
-    """打印内存使用日志"""
-    mem = get_memory_mb()
-    if mem > 0:
-        print("MEM [%s]: %.1f MB" % (tag, mem))
-    return mem
 
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1217,41 +1196,23 @@ def chat():
 
         if stream:
             def generate():
-                char_count = 0
-                last_log = 0
-                t0 = time.time()
-                reason = None
-                chunks = 0
                 try:
-                    mem0 = log_memory("stream_start")
-                    print("[STREAM] model=%s max_tokens=4096 timeout=180" % model_name)
-                    resp = client.chat.completions.create(
+                    response = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
                         stream=True,
-                        max_tokens=4096,
+                        max_tokens=8000,
                         timeout=180
                     )
-                    for chunk in resp:
-                        chunks += 1
+                    for chunk in response:
                         if chunk.choices and chunk.choices[0].delta.content:
-                            c = chunk.choices[0].delta.content
-                            char_count += len(c)
-                            yield "data: %s\n\n" % json.dumps({'choices': [{'delta': {'content': c}}]})
-                            if char_count - last_log >= 500:
-                                print("[STREAM] %d chars, %.1fs, chunks=%d" % (char_count, time.time()-t0, chunks))
-                                last_log = char_count
-                        if chunk.choices and chunk.choices[0].finish_reason:
-                            reason = chunk.choices[0].finish_reason
-                    mem1 = log_memory("stream_end")
-                    print("[STREAM] DONE: %d chars, %.1fs, reason=%s, mem=%.1f->%.1f" % (char_count, time.time()-t0, reason, mem0, mem1))
-                    gc.collect()
+                            content = chunk.choices[0].delta.content
+                            yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
                 except Exception as e:
-                    print("[STREAM] ERROR: %d chars, %.1fs, %s: %s" % (char_count, time.time()-t0, type(e).__name__, str(e)))
-                    yield "data: %s\n\n" % json.dumps({'error': str(e)})
+                    print(f"Stream error: {str(e)}")
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
                 finally:
                     yield "data: [DONE]\n\n"
-                    gc.collect()
                 
             return app.response_class(
                 generate(), 
