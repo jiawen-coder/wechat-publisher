@@ -5,9 +5,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('🚀 App 初始化');
     
-    // 初始化头像
-    initUserAvatar();
-    
     // 检查登录状态
     try {
         const authRes = await apiRequest('/api/auth/status');
@@ -18,24 +15,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             state.user = authData.user;
             localStorage.setItem('userId', state.userId);
             updateAuthUI(true);
+        } else {
+            // 未登录，显示登录按钮
+            updateAuthUI(false);
         }
     } catch (e) {
         console.warn('Auth check failed:', e);
+        // 出错时也显示登录按钮
+        updateAuthUI(false);
     }
     
     // 显示欢迎消息
     showWelcome();
 });
-
-function initUserAvatar() {
-    // 默认头像 SVG
-    const defaultAvatar = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%238b5cf6"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40" font-family="Arial">U</text></svg>`;
-    
-    const avatar = document.getElementById('user-avatar');
-    if (avatar) {
-        avatar.src = defaultAvatar;
-    }
-}
 
 function updateAuthUI(loggedIn) {
     const loginBtn = document.getElementById('login-btn');

@@ -20,7 +20,7 @@
                 <div class="header-actions">
                     <button class="icon-btn" onclick="openSettings()" title="设置">⚙️</button>
                     <div id="auth-area" style="position: relative; margin-left: 8px;">
-                        <button class="login-btn" id="login-btn" style="display:none;">
+                        <button class="login-btn" id="login-btn" onclick="location.href='/api/auth/login'">
                             <svg viewBox="0 0 24 24" width="16" height="16">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -29,7 +29,7 @@
                             </svg>
                             登录
                         </button>
-                        <div id="user-area">
+                        <div id="user-area" style="display:none;">
                             <img class="user-avatar" id="user-avatar" onclick="toggleUserMenu()" src="" alt="">
                             <div class="user-menu" id="user-menu">
                                 <div class="user-menu-header">
