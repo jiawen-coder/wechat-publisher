@@ -89,6 +89,31 @@ def get_heading_style(level: int, theme: dict) -> str:
             padding-left: 16px;
             border-left: 4px solid {theme['primary_color']};
         """
+    elif style_type == 'futuristic':
+        accent = theme.get('accent_color', theme['primary_color'])
+        base_style += f"""
+            padding: 10px 15px;
+            border: 1px solid {theme['primary_color']};
+            background: rgba(0, 242, 255, 0.05);
+            text-shadow: 0 0 10px {theme['primary_color']}50;
+            clip-path: polygon(0 0, 100% 0, 100% 70%, 95% 100%, 0 100%);
+            box-shadow: inset 0 0 15px {theme['primary_color']}20;
+        """
+    elif style_type == 'magazine':
+        base_style += f"""
+            padding-bottom: 12px;
+            border-bottom: 3px double {theme.get('accent_color', '#333')};
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-align: center;
+        """
+    elif style_type == 'notion':
+        base_style += f"""
+            padding: 4px 0;
+            border-bottom: 1px solid {theme.get('accent_color', '#eee')};
+            margin-bottom: 15px;
+        """
     
     return base_style.strip().replace('\n', ' ')
 
@@ -105,7 +130,10 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     Returns:
         适配公众号的 HTML 字符串
     """
-    theme = THEMES.get(theme_name, THEMES["professional"])
+    if isinstance(theme_name, dict):
+        theme = theme_name
+    else:
+        theme = THEMES.get(theme_name, THEMES["professional"])
     
     # 使用 markdown 库转换基础 HTML
     md = markdown.Markdown(extensions=[
@@ -122,6 +150,8 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     soup = BeautifulSoup(html_content, 'html.parser')
     
     # 获取主题配置
+    # 如果是自定义生成的主题，确保获取必要的字段
+    heading_style_type = theme.get('heading_style', 'normal')
     line_height = theme.get('line_height', 1.8)
     paragraph_indent = theme.get('paragraph_indent', False)
     blockquote_bg = theme.get('blockquote_bg', theme['secondary_color'])
@@ -207,25 +237,54 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     
     # 处理引用块
     for blockquote in soup.find_all('blockquote'):
-        blockquote['style'] = f"""
-            margin: 24px 0;
-            padding: 16px 20px;
-            border-left: 4px solid {theme['blockquote_border']};
-            background-color: {blockquote_bg};
-            border-radius: 0 8px 8px 0;
-            color: {theme['text_color']};
-        """.strip().replace('\n', ' ')
+        is_decorative = theme.get('decorative', False)
+        if theme_name == "futurism":
+            blockquote_style = f"""
+                margin: 24px 0;
+                padding: 20px;
+                border: 1px solid {theme['blockquote_border']}50;
+                background-color: {theme['blockquote_bg']};
+                border-left: 8px solid {theme['blockquote_border']};
+                position: relative;
+                box-shadow: 0 0 20px {theme['blockquote_border']}20;
+            """
+        elif theme_name == "magazine":
+            blockquote_style = f"""
+                margin: 40px 0;
+                padding: 30px 40px;
+                border: none;
+                background-color: {blockquote_bg};
+                position: relative;
+                text-align: center;
+                border-top: 1px solid {theme['blockquote_border']}30;
+                border-bottom: 1px solid {theme['blockquote_border']}30;
+            """
+        else:
+            blockquote_style = f"""
+                margin: 24px 0;
+                padding: 16px 20px;
+                border-left: 4px solid {theme['blockquote_border']};
+                background-color: {blockquote_bg};
+                border-radius: 0 8px 8px 0;
+                color: {theme['text_color']};
+            """
+        
+        blockquote['style'] = blockquote_style.strip().replace('\n', ' ')
+        
         # 处理引用块内的段落
         for p in blockquote.find_all('p'):
-            p['style'] = f"""
+            p_style = f"""
                 margin: 0;
                 padding: 0;
-                font-size: 15px;
-                line-height: 1.7;
+                font-size: 16px;
+                line-height: 1.8;
                 color: {theme['text_color']};
                 font-style: italic;
                 text-indent: 0;
-            """.strip().replace('\n', ' ')
+            """
+            if theme_name == "magazine":
+                p_style += "font-size: 18px; color: #555;"
+            p['style'] = p_style.strip().replace('\n', ' ')
     
     # 处理无序列表
     for ul in soup.find_all('ul'):
@@ -344,73 +403,81 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     return final_html
 
 
-def generate_custom_style_html(md_content: str, style_description: str, deepseek_api_key: str = None) -> str:
+def generate_custom_style_html(md_content: str, style_description: str, iflow_api_key: str = None) -> str:
     """
     根据用户自定义风格描述生成 HTML
     使用 AI 来解析风格描述并生成对应的样式
     """
     import openai
+    import os
+    import json
     
-    if not deepseek_api_key:
-        # 如果没有 API key，使用默认风格
+    if not iflow_api_key:
         return convert_markdown_to_wechat_html(md_content, "professional")
     
     try:
+        api_base = "https://apis.iflow.cn/v1"
+        model_name = "deepseek-v3"
+        
         client = openai.OpenAI(
-            api_key=deepseek_api_key,
-            base_url="https://api.deepseek.com"
+            api_key=iflow_api_key,
+            base_url=api_base
         )
         
-        # 让 AI 生成 CSS 变量
-        response = client.chat.completions.create(
-            model="deepseek-chat",  # DeepSeek V3.2
-            messages=[{
-                "role": "user",
-                "content": f"""根据以下风格描述，生成一组 CSS 颜色和字体配置（JSON格式）：
-
+        messages = [{
+            "role": "user",
+            "content": f"""你是一个顶级排版设计师。请根据用户描述，生成一个公众号样式的 JSON 配置。
 风格描述：{style_description}
 
-请返回以下格式的 JSON（只返回 JSON，不要其他内容）：
+请返回以下格式的 JSON（只返回 JSON，不要其他回复）：
 {{
-    "primary_color": "#颜色值",
-    "secondary_color": "#背景色",
-    "text_color": "#文字颜色",
+    "primary_color": "#主题主色",
+    "secondary_color": "#辅助色/背景色",
+    "accent_color": "#强调色（高亮）",
+    "text_color": "#正文颜色",
     "heading_color": "#标题颜色",
     "link_color": "#链接颜色",
-    "code_bg": "#代码背景色",
+    "code_bg": "#代码块背景",
     "blockquote_border": "#引用边框色",
     "blockquote_bg": "#引用背景色",
-    "font_family": "字体族",
-    "heading_style": "normal/underline/background/border-left",
-    "paragraph_indent": true/false,
-    "line_height": 1.8
+    "font_family": "字体栈",
+    "heading_style": "futuristic|magazine|notion|centered",
+    "decorative": "可选的CSS特殊修饰"
 }}"""
-            }],
-            max_tokens=500
+        }]
+        
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            max_tokens=800
         )
         
-        import json
-        style_json = response.choices[0].message.content.strip()
+        style_json_raw = response.choices[0].message.content.strip()
+        print(f"🤖 [converter.py AI调用] 返回: {style_json_raw[:100]}...")
+        
         # 尝试提取 JSON
-        if '```' in style_json:
-            style_json = style_json.split('```')[1]
+        if '```' in style_json_raw:
+            style_json = style_json_raw.split('```')[1]
             if style_json.startswith('json'):
                 style_json = style_json[4:]
+        else:
+            style_json = style_json_raw
         
         custom_theme = json.loads(style_json)
         
         # 补充缺失的字段
+        from backend.config import THEMES
         default_theme = THEMES["professional"]
         for key in default_theme:
             if key not in custom_theme:
                 custom_theme[key] = default_theme[key]
         
-        # 临时添加到主题中
-        THEMES["_custom_"] = custom_theme
-        return convert_markdown_to_wechat_html(md_content, "_custom_")
-        
+        return convert_markdown_to_wechat_html(md_content, custom_theme)
+
     except Exception as e:
-        print(f"自定义风格生成失败: {e}")
+        print(f"❌ 自定义风格生成失败 (converter.py): {str(e)}")
+        import traceback
+        traceback.print_exc()
         return convert_markdown_to_wechat_html(md_content, "professional")
 
 
