@@ -138,15 +138,18 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     heading_style = theme.get('heading_style', 'border-left')
     
     # ==================== 段落样式（核心阅读体验） ====================
+    letter_spacing = theme.get('letter_spacing', 0.8)
+    font_size = 16 if heading_style == 'editorial' else 15  # 社论风格用稍大字号
+    
     for p in soup.find_all('p'):
         indent = 'text-indent: 2em;' if paragraph_indent else ''
         p['style'] = f'''
-            margin: 0 0 1.2em 0;
+            margin: 0 0 1.4em 0;
             padding: 0;
-            font-size: 15px;
+            font-size: {font_size}px;
             line-height: {line_height};
             color: {text_color};
-            letter-spacing: 0.8px;
+            letter-spacing: {letter_spacing}px;
             word-break: break-word;
             {indent}
         '''.strip().replace('\n', ' ').replace('  ', ' ')
@@ -173,7 +176,31 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
                 letter-spacing: 0.5px;
             '''
             
-            if level <= 2 and heading_style == 'border-left':
+            if level == 1 and heading_style == 'editorial':
+                # 社论风格大标题 - 居中、大气、衬线
+                h['style'] = f'''
+                    margin: 40px 0 32px 0;
+                    font-size: 26px;
+                    font-weight: 700;
+                    color: {heading_color};
+                    line-height: 1.4;
+                    letter-spacing: 2px;
+                    text-align: center;
+                    font-family: 'Noto Serif SC', Georgia, serif;
+                '''.strip().replace('\n', ' ')
+            elif level == 2 and heading_style == 'editorial':
+                # 社论风格二级标题 - 上方分隔线，克制有力
+                h['style'] = f'''
+                    margin: 36px 0 20px 0;
+                    padding-top: 24px;
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: {heading_color};
+                    line-height: 1.4;
+                    letter-spacing: 1px;
+                    border-top: 1px solid #e0e0e0;
+                '''.strip().replace('\n', ' ')
+            elif level <= 2 and heading_style == 'border-left':
                 # 左边框风格 - 经典公众号样式
                 h['style'] = (base_style + f'''
                     padding: 10px 0 10px 14px;
@@ -252,27 +279,49 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
     
     # ==================== 引用块样式（公众号特色，重要内容高亮） ====================
     for blockquote in soup.find_all('blockquote'):
-        blockquote['style'] = f'''
-            margin: 20px 0;
-            padding: 16px 18px;
-            background: {blockquote_bg};
-            border-left: 3px solid {blockquote_border};
-            border-radius: 0 6px 6px 0;
-        '''.strip().replace('\n', ' ')
-        
-        # 引用块内段落
-        for p in blockquote.find_all('p'):
-            p['style'] = f'''
-                margin: 0 0 8px 0;
-                font-size: 14px;
-                line-height: 1.75;
-                color: #5c6370;
+        if heading_style == 'editorial':
+            # 社论风格引用 - 居中、斜体、有分隔线，像书籍中的金句
+            blockquote['style'] = f'''
+                margin: 32px 24px;
+                padding: 20px 0;
+                background: transparent;
+                border-top: 1px solid #e0e0e0;
+                border-bottom: 1px solid #e0e0e0;
+                border-left: none;
+                text-align: center;
             '''.strip().replace('\n', ' ')
-        # 最后一个段落去掉底部 margin
-        last_p = blockquote.find_all('p')
-        if last_p:
-            style = last_p[-1].get('style', '')
-            last_p[-1]['style'] = style.replace('margin: 0 0 8px 0', 'margin: 0')
+            
+            for p in blockquote.find_all('p'):
+                p['style'] = f'''
+                    margin: 0;
+                    font-size: 15px;
+                    line-height: 1.9;
+                    color: #4a4a4a;
+                    font-style: italic;
+                    font-family: 'Noto Serif SC', Georgia, serif;
+                '''.strip().replace('\n', ' ')
+        else:
+            # 默认引用样式
+            blockquote['style'] = f'''
+                margin: 20px 0;
+                padding: 16px 18px;
+                background: {blockquote_bg};
+                border-left: 3px solid {blockquote_border};
+                border-radius: 0 6px 6px 0;
+            '''.strip().replace('\n', ' ')
+            
+            for p in blockquote.find_all('p'):
+                p['style'] = f'''
+                    margin: 0 0 8px 0;
+                    font-size: 14px;
+                    line-height: 1.75;
+                    color: #5c6370;
+                '''.strip().replace('\n', ' ')
+            # 最后一个段落去掉底部 margin
+            last_p = blockquote.find_all('p')
+            if last_p:
+                style = last_p[-1].get('style', '')
+                last_p[-1]['style'] = style.replace('margin: 0 0 8px 0', 'margin: 0')
     
     # ==================== 列表样式（清晰的层次结构） ====================
     for ul in soup.find_all('ul'):

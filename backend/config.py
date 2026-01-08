@@ -29,6 +29,26 @@ WECHAT_API_KEY = ""  # 你的微信 API Key
 # 主题风格配置 - 差异化设计
 # =============================================
 THEMES = {
+    # ========== 深度洞察（首推） ==========
+    "insight": {
+        "name": "📰 深度洞察",
+        "description": "经济学人/财新风格，大留白、克制配色，适合商业深度长文",
+        "primary_color": "#1a1a1a",
+        "secondary_color": "#ffffff",
+        "accent_color": "#c41e3a",  # 点睛红，克制使用
+        "text_color": "#2d2d2d",
+        "heading_color": "#0d0d0d",
+        "link_color": "#c41e3a",
+        "code_bg": "#f7f7f7",
+        "blockquote_border": "#c41e3a",
+        "blockquote_bg": "#fafafa",
+        "font_family": "'Noto Serif SC', 'Source Han Serif CN', Georgia, 'Times New Roman', serif",
+        "heading_style": "editorial",  # 新样式：社论风格
+        "paragraph_indent": True,  # 首行缩进，书籍感
+        "line_height": 2.0,  # 大行距，阅读舒适
+        "letter_spacing": 1,  # 字间距
+    },
+    
     # ========== 商务/专业类 ==========
     "professional": {
         "name": "💼 商务蓝",
