@@ -330,17 +330,17 @@ def convert_markdown_to_wechat_html(md_content: str, theme_name: str = "professi
             '''.strip().replace('\n', ' ')
         
         for p in blockquote.find_all('p'):
-                p['style'] = f'''
-                    margin: 0 0 8px 0;
-                    font-size: 14px;
-                    line-height: 1.75;
-                    color: #5c6370;
-                '''.strip().replace('\n', ' ')
-            # 最后一个段落去掉底部 margin
-            last_p = blockquote.find_all('p')
-            if last_p:
-                style = last_p[-1].get('style', '')
-                last_p[-1]['style'] = style.replace('margin: 0 0 8px 0', 'margin: 0')
+            p['style'] = '''
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                line-height: 1.75;
+                color: #5c6370;
+            '''.strip().replace('\n', ' ')
+        # 最后一个段落去掉底部 margin
+        last_p = blockquote.find_all('p')
+        if last_p:
+            style = last_p[-1].get('style', '')
+            last_p[-1]['style'] = style.replace('margin: 0 0 8px 0', 'margin: 0')
     
     # ==================== 列表样式（清晰的层次结构） ====================
     for ul in soup.find_all('ul'):
