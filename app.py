@@ -22,6 +22,7 @@ import sys
 import json
 import uuid
 import hashlib
+import resource
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +30,12 @@ from flask import Flask, request, jsonify, send_from_directory, render_template,
 from flask_cors import CORS
 import openai
 import requests
+
+def log_mem(tag=""):
+    """打印内存使用(MB)"""
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    mb = usage.ru_maxrss / 1024 / 1024 if sys.platform == 'darwin' else usage.ru_maxrss / 1024
+    print(f"[MEM] {tag}: {mb:.1f}MB")
 
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -1196,28 +1203,57 @@ def chat():
 
         if stream:
             def generate():
-                char_count = 0  # 只统计字数，不累积全文（节省内存）
+                import time
+                import gc
+                
+                char_count = 0  # 只统计字数，绝不累积全文
+                start_time = time.time()
+                last_log = 0
+                finish_reason = None
+                
+                log_mem("流式开始")
+                print(f"🚀 [STREAM] 开始 model={model_name} max_tokens=4096")
+                
                 try:
                     response = client.chat.completions.create(
                         model=model_name,
                         messages=messages,
                         stream=True,
-                        max_tokens=4096,  # Render免费版内存限制
-                        timeout=120
+                        max_tokens=4096,
+                        timeout=180
                     )
+                    
                     for chunk in response:
+                        # 提取内容，立即发送，不存储
                         if chunk.choices and chunk.choices[0].delta.content:
                             content = chunk.choices[0].delta.content
                             char_count += len(content)
                             yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
+                            
+                            # 每1000字打印进度
+                            if char_count - last_log >= 1000:
+                                elapsed = time.time() - start_time
+                                log_mem(f"已生成{char_count}字")
+                                print(f"   📝 {char_count}字 {elapsed:.0f}s")
+                                last_log = char_count
+                        
+                        # 记录结束原因
+                        if chunk.choices and chunk.choices[0].finish_reason:
+                            finish_reason = chunk.choices[0].finish_reason
                     
-                    # 只记录摘要日志，节省内存
-                    print(f"✅ [STREAM] 完成，共 {char_count} 字")
+                    elapsed = time.time() - start_time
+                    print(f"✅ [STREAM] 完成 {char_count}字 {elapsed:.0f}s reason={finish_reason}")
+                    
                 except Exception as e:
-                    print(f"❌ Stream error: {str(e)}")
+                    elapsed = time.time() - start_time
+                    print(f"❌ [STREAM] 错误 {char_count}字 {elapsed:.0f}s")
+                    print(f"❌ [STREAM] {type(e).__name__}: {str(e)[:200]}")
                     yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    
                 finally:
                     yield "data: [DONE]\n\n"
+                    log_mem("流式结束")
+                    gc.collect()  # 强制回收
                 
             return app.response_class(
                 generate(), 
@@ -1478,6 +1514,7 @@ def upload_image_file():
 # ==================== 主入口 ====================
 
 if __name__ == '__main__':
+    log_mem("启动")
     print("=" * 50)
     print("📝 微信公众号文章发布助手")
     print("=" * 50)
@@ -1487,3 +1524,6 @@ if __name__ == '__main__':
     print("=" * 50)
     
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+# Gunicorn 启动时打印
+log_mem("应用加载")
