@@ -1500,8 +1500,15 @@ def speech_to_text():
     user_id = request.headers.get('X-User-Id')
     cfg = load_user_config(user_id)
     
-    # 检查是否配置了 Groq API Key（环境变量优先）
-    groq_api_key = os.environ.get("GROQ_API_KEY") or cfg.get("groq_api_key")
+    # 检查是否配置了 Groq API Key（用户配置优先，环境变量作为备选）
+    user_groq_key = cfg.get("groq_api_key", "")
+    env_groq_key = os.environ.get("GROQ_API_KEY", "")
+    groq_api_key = user_groq_key or env_groq_key
+    
+    print(f"[DEBUG speech-to-text] user_id: {user_id}")
+    print(f"[DEBUG speech-to-text] user_groq_key exists: {bool(user_groq_key)}, prefix: {user_groq_key[:10] if user_groq_key else 'N/A'}...")
+    print(f"[DEBUG speech-to-text] env_groq_key exists: {bool(env_groq_key)}")
+    print(f"[DEBUG speech-to-text] final groq_api_key exists: {bool(groq_api_key)}")
     
     if not groq_api_key:
         return jsonify({
