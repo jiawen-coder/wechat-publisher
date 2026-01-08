@@ -735,35 +735,40 @@ def convert_content():
 @app.route('/api/convert-custom', methods=['POST'])
 def convert_custom():
     """使用自定义风格转换"""
-    data = request.json
-    content = data.get('content', '')
-    style_description = data.get('style_description', '')
-    
-    if not content:
-        return jsonify({"error": "内容不能为空"}), 400
-    
-    if not style_description:
-        return jsonify({"error": "请提供风格描述"}), 400
-    
-    user_id = request.headers.get('X-User-Id')
-    cfg = load_user_config(user_id)
-    api_key = cfg.get("iflow_api_key")
-    
-    # 调试日志
-    print(f"[DEBUG convert_custom] user_id: {user_id}")
-    print(f"[DEBUG convert_custom] style_description: {style_description}")
-    print(f"[DEBUG convert_custom] iflow_api_key exists: {bool(api_key)}")
-    if api_key:
-        print(f"[DEBUG convert_custom] iflow_api_key prefix: {api_key[:10]}...")
-    
-    html = generate_custom_style_html(content, style_description, api_key)
-    metadata = extract_metadata(content)
-    
-    return jsonify({
-        "html": html,
-        "title": metadata["title"],
-        "summary": metadata["summary"]
-    })
+    try:
+        data = request.json
+        content = data.get('content', '')
+        style_description = data.get('style_description', '')
+        
+        if not content:
+            return jsonify({"error": "内容不能为空"}), 400
+        
+        if not style_description:
+            return jsonify({"error": "请提供风格描述"}), 400
+        
+        user_id = request.headers.get('X-User-Id')
+        cfg = load_user_config(user_id)
+        api_key = cfg.get("iflow_api_key")
+        
+        # 调试日志
+        print(f"[DEBUG convert_custom] user_id: {user_id}")
+        print(f"[DEBUG convert_custom] style_description: {style_description}")
+        print(f"[DEBUG convert_custom] content_length: {len(content)}")
+        print(f"[DEBUG convert_custom] iflow_api_key exists: {bool(api_key)}")
+        
+        html = generate_custom_style_html(content, style_description, api_key)
+        metadata = extract_metadata(content)
+        
+        return jsonify({
+            "html": html,
+            "title": metadata["title"],
+            "summary": metadata["summary"]
+        })
+    except Exception as e:
+        print(f"[ERROR convert_custom] 自定义风格转换失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"自定义风格生成失败: {str(e)}"}), 500
 
 
 @app.route('/api/parse', methods=['POST'])
@@ -920,15 +925,14 @@ def generate_cover():
 
 
 def generate_custom_style_html(md_content: str, style_description: str, iflow_api_key: str = None) -> str:
-    """根据用户自定义风格描述生成 HTML（CSS JSON 方案，省内存）"""
+    """根据用户自定义风格描述，让 AI 直接生成完整的微信公众号 HTML"""
     import openai
-    import json as json_lib
     import re
     
     print(f"[DEBUG generate_custom_style_html] 开始处理, style: {style_description}")
-    print(f"[DEBUG generate_custom_style_html] API Key exists: {bool(iflow_api_key)}")
+    print(f"[DEBUG generate_custom_style_html] 文章长度: {len(md_content)} 字符")
     
-    # 优先从用户配置获取，环境变量作为备选
+    # 用户配置优先，环境变量作为备选
     api_key = iflow_api_key or os.environ.get("IFLOW_API_KEY")
     
     if not api_key:
@@ -936,53 +940,67 @@ def generate_custom_style_html(md_content: str, style_description: str, iflow_ap
         return convert_markdown_to_wechat_html(md_content, "professional")
     
     try:
-        # 获取样式 Prompt（只生成 CSS 配置，不发送文章内容，省内存）
-        prompt = get_prompt('layout')
+        # 使用 layout_html prompt（支持环境变量覆盖）
+        prompt_template = get_prompt('layout_html')
+        
+        if not prompt_template:
+            prompt_template = """你是顶级的微信公众号排版设计师。
 
-        print(f"[DEBUG generate_custom_style_html] 🚀 正在调用 AI (iFlow)...")
+## 用户风格要求
+{style_description}
+
+## 文章内容（Markdown格式）
+{md_content}
+
+## 任务
+请将上述文章转换为微信公众号富文本 HTML，应用用户描述的风格。
+
+## 输出要求
+1. 直接输出可用于微信公众号的 HTML 代码
+2. 所有样式必须使用内联 style 属性（微信限制，不支持 class）
+3. 不要输出 markdown 代码块标记（如 ```html）或任何解释文字
+4. 确保排版美观、层次清晰、阅读舒适
+5. 标题使用合适的颜色、字号和样式
+6. 段落使用 <section> 或 <p> 包裹，保持适当的行距（line-height: 1.8-2.0）
+
+直接输出 HTML 代码："""
+
+        prompt = prompt_template.format(
+            style_description=style_description,
+            md_content=md_content
+        )
+
+        print(f"[DEBUG generate_custom_style_html] 🚀 正在调用 AI (iFlow) 生成完整 HTML...")
         api_base = "https://apis.iflow.cn/v1"
         model_name = "deepseek-v3"
         
         client = openai.OpenAI(api_key=api_key, base_url=api_base)
-        messages = [{"role": "user", "content": prompt.format(style_description=style_description)}]
+        messages = [{"role": "user", "content": prompt}]
         
+        # 使用合理的超时和 token 限制
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
-            max_tokens=800,  # CSS JSON 只需要少量 token
-            timeout=30
+            max_tokens=4000,  # 减少到4000，够用且更快
+            timeout=60  # 60秒超时
         )
-        style_json = response.choices[0].message.content.strip()
+        html_content = response.choices[0].message.content.strip()
         
-        # 记录详细日志
-        log_ai_call("/api/convert-custom [CSS JSON]", messages, style_json, model=model_name)
-        print(f"[DEBUG generate_custom_style_html] ✅ AI 返回: {style_json[:200]}...")
+        log_ai_call("/api/convert-custom [Full HTML]", messages, html_content[:300] + "...", model=model_name)
+        print(f"[DEBUG generate_custom_style_html] ✅ AI 返回 HTML 长度: {len(html_content)}")
         
-        # 从代码块中提取 JSON
-        if '```' in style_json:
-            code_block_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', style_json)
-            if code_block_match:
-                style_json = code_block_match.group(1).strip()
+        # 清理可能的代码块标记
+        if html_content.startswith('```'):
+            html_content = re.sub(r'^```(?:html)?\s*\n?', '', html_content)
+            html_content = re.sub(r'\n?```\s*$', '', html_content)
         
-        # 如果不是以 { 开头，尝试找到 JSON
-        if not style_json.startswith('{'):
-            json_match = re.search(r'\{[\s\S]*\}', style_json)
-            if json_match:
-                style_json = json_match.group(0)
-        
-        print(f"[DEBUG generate_custom_style_html] 📝 清理后 JSON: {style_json[:100]}...")
-        custom_theme = json_lib.loads(style_json)
-        print(f"[DEBUG generate_custom_style_html] ✅ 解析成功: {list(custom_theme.keys())}")
-        
-        # 补充缺失的字段
-        default_theme = THEMES["professional"]
-        for key in default_theme:
-            if key not in custom_theme:
-                custom_theme[key] = default_theme[key]
-        
-        # 临时添加到主题中
-        THEMES["_custom_"] = custom_theme
-        return convert_markdown_to_wechat_html(md_content, "_custom_")
+        # 验证返回的是有效 HTML
+        if '<' in html_content and '>' in html_content:
+            print(f"[DEBUG generate_custom_style_html] ✅ 生成成功")
+            return html_content
+        else:
+            print(f"[DEBUG generate_custom_style_html] ⚠ 返回内容不像 HTML，降级处理")
+            return convert_markdown_to_wechat_html(md_content, "professional")
         
     except Exception as e:
         print(f"[DEBUG generate_custom_style_html] ❌ 自定义风格生成失败: {e}")
